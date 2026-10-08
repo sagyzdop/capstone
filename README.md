@@ -62,8 +62,8 @@ flowchart LR
 | Name         | Email                   | Role            |
 | ------------ | ----------------------- | --------------- |
 | Adnan Yazici | adnan.yazici@nu.edu.kz  | Main Supervisor |
-| Enver Ever   | enverevermetu@gmail.com | -               |
-| M            | -                       | -               |
+| Enver Ever   | enverevermetu@gmail.com | Supervisor      |
+| M            | -                       | Supervisor      |
 
 
 ### Robotics team
@@ -74,6 +74,7 @@ flowchart LR
 | Gourav Devappa    | gourav.devappa@nu.edu.kz    | Supervisor |
 | Mirat Serik       | mirat.serik@nu.edu.kz       | -          |
 | Adil Ismagambetov | adil.ismagambetov@nu.edu.kz | -          |
+| Yevgeniy Dikun    | yevgeniy.dikun@nu.edu.kz    | -          |
 
 
 <details>
