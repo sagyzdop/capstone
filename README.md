@@ -37,7 +37,7 @@ flowchart LR
 
 ## Status
 
-- [x] Initial architecure – stationary drone, tumblweed robot deployed at site, station as orchestrator
+- [x] Initial architecure decided – stationary drone, tumblweed robot deployed at site, station as orchestrator
 - [ ] Concept of operations agreed by the team
 - [ ] Station–robot interface agreed with the Robotics team
 - [ ] Datasets selected
@@ -69,10 +69,11 @@ flowchart LR
 ### Robotics team
 
 
-| Name        | Email                 | Role |
-| ----------- | --------------------- | ---- |
-| Mirat Serik | mirat.serik@nu.edu.kz | -    |
-| -           | -                     | -    |
+| Name              | Email                       | Role       |
+| ----------------- | --------------------------- | ---------- |
+| Gourav Devappa    | gourav.devappa@nu.edu.kz    | Supervisor |
+| Mirat Serik       | mirat.serik@nu.edu.kz       | -          |
+| Adil Ismagambetov | adil.ismagambetov@nu.edu.kz | -          |
 
 
 <details>
