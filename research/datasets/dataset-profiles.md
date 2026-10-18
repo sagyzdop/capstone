@@ -1,6 +1,6 @@
 # Dataset Profiles
 
-Profiles of the four downloaded datasets (two modalities of WiSARD counted separately), in the same eight points each:
+Profiles of the five downloaded datasets (two modalities of WiSARD counted separately), in the same eight points each:
 summary, size, distinct backgrounds, people per image, pixels per person, contrast, sharpness, crowding.
 Every number is mean plus the 5th / 25th / 50th / 75th / 95th percentiles (written `p5 / p25 / p50 / p75 / p95`)
 over all images or all annotated persons. Numbers come from `research/datasets/assets/audit/audit.json` and
@@ -8,20 +8,20 @@ over all images or all annotated persons. Numbers come from `research/datasets/a
 
 ## At a glance
 
-| | HIT-UAV | C2A | WiSARD IR | WiSARD RGB |
-|---|---|---|---|---|
-| Modality | thermal | RGB, synthetic | thermal | RGB |
-| Images | 2,898 | 10,215 | 264 | 264 |
-| Persons | 12,312 | 360,467 | 1,006 | 1,022 |
-| Resolution | 640×512 | 123×152 – 5184×3456 | 640×512 | 3840×2160 |
-| Distinct backgrounds | ≈20 scenes (264 clips) | 2,043 photos (≈400 scenes) | 1 site | 1 site |
-| Persons / image, mean (p50) | 4.25 (2) | 35.3 (34) | 3.81 (4) | 3.87 (4) |
-| Pixels / person, mean (p50) | 271 (221) | 230 (144) | 328 (297) | 5,147 (4,446) |
-| Person contrast, mean (p50) | +1.00 (+0.90) | −0.21 (−0.19) | +1.13 (+1.12) | +0.23 (+0.21) |
-| Low-contrast persons (\|c\| < 0.5) | 25.7% | 68.2% | 2.9% | 88.6% |
-| Person sharpness at 640, p50 | 437 | 662 | 3,046 | 4,058 |
-| Nearest neighbour, p50 (body sizes) | 1.82 | 2.72 | 2.06 | 2.00 |
-| Persons with a neighbour < 2 sizes | 53.3% | 38.1% | 48.6% | 49.9% |
+| | HIT-UAV | C2A | WiSARD IR | WiSARD RGB | HERIDAL |
+|---|---|---|---|---|---|
+| Modality | thermal | RGB, synthetic | thermal | RGB | RGB, real SAR |
+| Images | 2,898 | 10,215 | 264 | 264 | 1,579 |
+| Persons | 12,312 | 360,467 | 1,006 | 1,022 | 3,073 |
+| Resolution | 640×512 | 123×152 – 5184×3456 | 640×512 | 3840×2160 | 640×640, stretched from 4:3 |
+| Distinct backgrounds | ≈20 scenes (264 clips) | 2,043 photos (≈400 scenes) | 1 site | 1 site | ≈15 sites, 11 scene types |
+| Persons / image, mean (p50) | 4.25 (2) | 35.3 (34) | 3.81 (4) | 3.87 (4) | 1.95 (1) |
+| Pixels / person, mean (p50) | 271 (221) | 230 (144) | 328 (297) | 5,147 (4,446) | 146 (126) |
+| Person contrast, mean (p50) | +1.00 (+0.90) | −0.21 (−0.19) | +1.13 (+1.12) | +0.23 (+0.21) | −0.13 (−0.09) |
+| Low-contrast persons (\|c\| < 0.5) | 25.7% | 68.2% | 2.9% | 88.6% | 70.0% |
+| Person sharpness at 640, p50 | 437 | 662 | 3,046 | 4,058 | 3,818 |
+| Nearest neighbour, p50 (body sizes) | 1.82 | 2.72 | 2.06 | 2.00 | 5.42 |
+| Persons with a neighbour < 2 sizes | 53.3% | 38.1% | 48.6% | 49.9% | 23.4% |
 
 ## How the metrics are measured
 
@@ -452,6 +452,150 @@ labels agree.
 
 ---
 
+## 5. HERIDAL (RGB, real SAR, Roboflow export)
+
+The real-world RGB test set chosen in [datasets.md](./datasets.md), measured on the same eight points.
+
+> **Which copy.** These numbers describe the Roboflow export ["Heridal Human Detection" v4](https://universe.roboflow.com/drone-internship/heridal-human-detection) (COCO JSON, CC BY 4.0, 167 MB), not the 8.3 GB Zenodo original. Roboflow stretch-resized every frame to **640×640**, so people appear 25% narrower than they are (horizontal scale 0.160, vertical 0.213). Sizes, sharpness and aspect ratios describe that export; the ~4000×3000 originals would carry about 29× more pixels per person.
+
+Every image (1,579) and every person box (3,073) is included, with no sampling. Numbers come from `research/datasets/assets/heridal/summary.json` and `scene_types.json`.
+
+### Summary
+
+- **Purpose:** detect lost or injured people in UAV imagery for wilderness search and rescue (Božić-Štulić, Marušić & Gotovac, *IJCV* 2019). Croatian karst plateau, maquis, pine forest, ravines, snow and one city park. Volunteers stand, walk, sit and lie.
+- **Task:** single-class person detection, essentially **tiny-object detection in clutter**. In frames with people they cover 0.11% of the image (median 0.05%).
+- **Annotations:** COCO JSON per split. Categories are `0: Human` and `1: human`; **all 3,073 boxes use id 1**, and id 0 is a Roboflow super-category placeholder, so map everything to `person`.
+
+| | Value |
+|---|---|
+| On disk | 166.3 MiB (images 99.7%) |
+| Images | 1,579, all 640×640 JPEG (mean 107 KB) |
+| Persons | 3,073 |
+
+| Split | Images | Persons | Empty images | Persons / image |
+|---|---:|---:|---:|---:|
+| train | 1,258 | 2,468 | 475 (37.8%) | 1.96 |
+| valid | 220 | 268 | 86 (39.1%) | 1.22 |
+| test | 101 | 337 | 0 | 3.34 |
+
+All valid images carry `train_…` original names, so Roboflow carved valid out of the original train set.
+
+### Size
+
+| | mean | p5 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|---|---|
+| area, px² | 146 | 47 | 86 | 126 | 185 | 315 |
+| side √(w·h), px | 11.6 | 6.8 | 9.2 | 11.2 | 13.6 | 17.7 |
+| est. source area, px² | 4,290 | 1,370 | 2,505 | 3,691 | 5,420 | 9,229 |
+
+- **Size classes:** < 8×8 px: 13.6%. < 16×16 px: 89.7%. < 32×32 px: 100%.
+- **Aspect ratio:** median w/h is 0.76, about 1.0 once the stretch is undone. People seen from above are close to square, unlike the upright-pedestrian boxes most COCO models expect.
+- **Narrow range:** about 6.7× in area from p5 to p95, consistent with a fairly constant flight altitude. Priors of about 6 to 20 px cover 90% of people.
+
+![size](assets/heridal/person_size.png)
+
+### Distinct backgrounds
+
+Counted at four levels, because "background" is ambiguous.
+
+| Level | Method | Count |
+|---|---|---:|
+| Location code | 3-letter token in the original file name | 17 |
+| Physical site | codes merged after visual check (MOB = BLA, GRO = GOR) | ≈15 |
+| **Scene type** | colour + texture features → KMeans (k = 29) → labelled by hand | **11** (9–12) |
+| Unique view | perceptual-hash (dHash) near-duplicate groups | 1,275 |
+
+![locations](assets/heridal/backgrounds.png)
+
+The distribution is very skewed, and **ZRI, an urban park, holds 42% of all persons** (10.3 per image). Five codes have no test images; four appear only in test. Hamming distance to the nearest neighbour is bimodal (near-duplicates 0–35, unrelated 85–105), so about 19% of frames repeat a scene already in the set.
+
+![dhash](assets/heridal/dhash_nearest.png)
+
+Scene types, from the k = 29 partition labelled by eye. The silhouette score stays low and rising up to k = 29, so scenes form a continuum rather than crisp clusters.
+
+| Scene type | Images | train / valid / test | Persons / img | Empty |
+|---|---:|---|---:|---:|
+| Karst mosaic (grass + conifer / shrub clumps) | 333 | 289 / 29 / 15 | 0.78 | 54% |
+| Closed forest canopy | 269 | 197 / 42 / 30 | 1.70 | 20% |
+| Mediterranean shrubland / maquis | 268 | 221 / 47 / **0** | 1.35 | 33% |
+| Dry karst grassland | 219 | 173 / 40 / 6 | 0.82 | 49% |
+| Urban park | 129 | 122 / 4 / 3 | 9.76 | 12% |
+| Leafless grey winter scrub, hazy meadow | 111 | 74 / 20 / 17 | 1.87 | 14% |
+| Dark sparse woodland, low light | 69 | 43 / 14 / 12 | 1.58 | 26% |
+| Snow | 68 | 55 / 13 / **0** | 1.44 | 47% |
+| Riverside meadow / woodland edge | 58 | 43 / 8 / 7 | 1.00 | 59% |
+| Cliffs / ravines with hard shadow | 36 | 30 / 0 / 6 | 1.25 | 39% |
+| Autumn deciduous forest | 19 | 11 / 3 / 5 | 2.00 | 0% |
+
+### People per image
+
+| | mean | p5 | p25 | p50 | p75 | p95 | max |
+|---|---|---|---|---|---|---|---|
+| all images | 1.95 | 0 | 0 | 1 | 2 | 8 | 35 |
+| images with people | 3.02 | 1 | 1 | 2 | 3 | 11 | 35 |
+| test only | 3.34 | 1 | 2 | 2 | 3 | 8 | 18 |
+
+Zero-inflated with a long tail from ZRI. The test split has no empty frames, so **measure image-level false positives on valid, not test**.
+
+![people](assets/heridal/people_per_image.png)
+
+### Contrast
+
+| | mean | p5 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|---|---|
+| person contrast c (team metric) | −0.13 | −1.05 | −0.44 | −0.09 | +0.20 | +0.65 |
+| person CNR (\|μbox − μring\| / σring) | 0.74 | 0.05 | 0.23 | 0.50 | 0.98 | 2.07 |
+| person ΔE\*ab (CIELAB) | 13.4 | 3.9 | 8.3 | 12.6 | 17.8 | 24.9 |
+| image RMS contrast (0–1) | 0.164 | 0.097 | 0.138 | 0.161 | 0.195 | 0.230 |
+
+- **People are camouflaged in grey level.** 70% have \|c\| < 0.5 and 76% have CNR < 1. On average they are slightly *darker* than their surroundings.
+- **Colour separates them better.** Median ΔE is 12.6 and only 35% have ΔE < 10. The lowest-CNR crops include clearly visible people whose brightness happens to match the ground. Grey-level metrics are a lower bound on separability here for the same reason as in §6 of this document.
+- **Low image RMS (< 0.10)** means flat, dim scenes; **high (> 0.23)** means sunlit limestone or snow with dark trees, which is high contrast but also high clutter.
+
+![contrast](assets/heridal/contrast.png)
+
+![person crops by CNR](assets/heridal/examples_person_cnr.png)
+
+### Sharpness
+
+| | mean | p5 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|---|---|
+| person sharpness @640 (Laplacian var) | 4,674 | 634 | 1,834 | 3,818 | 6,780 | 11,505 |
+| image sharpness @640 | 2,929 | 573 | 1,254 | 2,830 | 4,208 | 6,360 |
+| Crête-Roffet blur (0 sharp, 1 blurred) | 0.202 | 0.172 | 0.182 | 0.195 | 0.214 | 0.253 |
+
+- **Crisp by the team's guide**, in the same range as WiSARD RGB (4,058). The 6× downscale concentrates detail.
+- **Laplacian variance mostly measures texture.** The lowest frames are sharp photos of smooth lawns, the highest sunlit conifer canopy. Spearman ρ with RMS contrast is 0.61.
+- No severely blurred frames on visual review.
+
+![sharpness](assets/heridal/sharpness.png)
+
+### Crowding
+
+| | mean | p5 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|---|---|
+| nearest neighbour, body sizes | 10.4 | 0.87 | 1.86 | 5.42 | 15.0 | 35.9 |
+| nearest neighbour, px (640) | 111 | 9 | 21 | 69 | 169 | 365 |
+| close-companion ratio (neighbour within 5 sizes) | 0.26 | 0 | 0 | 0 | 0.64 | 1 |
+
+- **The least crowded of all five sets.** 12.7% of people are alone in their frame, only 23.4% have a neighbour within 2 sizes (other sets: 38 to 53%), and 7.5% of boxes overlap another box.
+- Grouped frames are rare: 59 of 629 multi-person images have everyone in a group.
+- **The difficulty is finding few tiny people in large cluttered scenes, not separating crowds.** Favour recall: a low confidence threshold, small-object heads and tiling.
+
+![crowding](assets/heridal/crowding.png)
+
+### Caveats
+
+- **Source resolution** (4000×3000) is assumed from the HERIDAL paper. It only affects the estimated-source rows and the aspect correction.
+- **Image metrics describe the export, not the original imagery.** The stretch and JPEG re-compression inflate the sharpness numbers.
+- **No altitude or GSD:** EXIF was stripped, so person sizes cannot be given in metres.
+- **Empty images** are treated as true negatives on the basis of spot checks, not full review.
+- **Scene types** are one analyst's manual labels over automatic clusters.
+- **Thresholds are design choices:** the 5-size crowding radius, the dHash threshold of 40, and the ring widths. Per-person raw values are in `research/datasets/assets/heridal/persons.csv`.
+- **Licence:** the Roboflow page states CC BY 4.0, while [datasets.md](./datasets.md) lists CC BY 3.0 for the Zenodo derivative. Confirm before publishing anything trained on it.
+
+---
+
 ## What the profiles say together
 
 - **Only HIT-UAV is trainable for thermal.** It is real, has the right sensor and enough images, but only
@@ -462,6 +606,11 @@ labels agree.
   - Use it for pretraining or augmentation sources, not as evidence of field accuracy.
 - **WiSARD is one site.** Good for an honest field-like test of RGB, IR and fusion, but its 264 frames are
   one background and one group of four.
+- **HERIDAL is the only real RGB set with many backgrounds, and its people are the smallest of all five.**
+  - Median person is 126 px², about 11 px side. 90% are under 16×16 px and 14% under 8×8, so tiling or a
+    stride-4 head is needed, as for WiSARD RGB.
+  - Its 44% cross-split leak and unrepresentative test split are covered in [dataset-suitability.md](./dataset-suitability.md) §9.
+  - 561 empty frames (35.5%) are useful hard negatives for image-level false positives.
 - **Thermal vs RGB is a contrast vs detail trade.**
 
   | | Persons stand out | Edges at 640 | Resolution |
@@ -480,4 +629,13 @@ labels agree.
 python src/detection/audit.py --out research/datasets/assets/audit
 # distinct backgrounds (ResNet-50 embeddings + clustering) -> backgrounds.json + backgrounds_<name>.png
 python src/detection/backgrounds.py --out research/datasets/assets/audit
+
+# HERIDAL needs its own scripts: unzip the Roboflow export into data/raw/heridal-roboflow/
+pip install numpy opencv-python-headless scikit-learn scipy matplotlib
+python src/detection/heridal_profile.py          # metrics, tables, plots -> research/datasets/assets/heridal/
+python src/detection/heridal_cluster_sheets.py   # contact sheets of the 29 background clusters
+python src/detection/heridal_scenes.py           # manual cluster -> scene-type mapping -> scene_types.json
+python src/detection/heridal_checks.py           # extremes, crowding ratio 1.0, dHash sensitivity
 ```
+
+Seeds are fixed and files are processed in sorted order. A HERIDAL run takes about 35 s on a laptop CPU.

@@ -64,6 +64,58 @@ does not constrain us at the intended geometry. Rubble does. A dense concrete wa
 s buys 7.5 mAP points for 3.3× the FLOPs, and the tiled RGB path is already the slowest thing we
 run. The gap worth closing is training data, not capacity.
 
+## Coverage
+
+Coverage is set by field of view and altitude. Sensor width is not in the formula, so a 1280
+camera and a 4K camera with the same lens see identical ground. Resolution decides how high the
+drone can hover before a person falls under the 8 px detection floor, not how much it can see.
+
+| Altitude | Swath (72° RGB) | Person px @1280 | @4K | Hectares in 2 min @2 m/s |
+| --- | --- | --- | --- | --- |
+| 20 m | 29 m | 20 | 59 | 0.70 |
+| 30 m | 44 m | 13 | 40 | 1.05 |
+| 40 m | 58 m | 10 | 30 | 1.39 |
+| 50 m | 73 m | 8 | 24 | 1.74 |
+
+A car park is 0.1 ha, a small building 0.2, a city block 2. So at 40 m a two-minute sweep covers
+about one collapsed building, with persons still at 10 px. 1280 reaches that; 4K buys nothing.
+
+Thermal has a 40° field of view against RGB's 72°, which halves the swath to 15 to 29 m between
+20 and 50 m. Both modalities still cover the same ground, thermal just slows the sweep.
+
+This is why 4K is not worth sending: it costs 4× the bytes and 40× the detector time to reach an
+altitude the drone was never going to use.
+
+## Rates
+
+Design against 100 Mbit/s per link. Every link in the system shares the station's channel.
+
+| Link | Payload | Rate | Bytes/frame | Bandwidth |
+| --- | --- | --- | --- | --- |
+| Drone → station | Thermal JPEG 640×512 | 30 FPS | 139 KiB | 34 Mbit/s |
+| Drone → station | RGB JPEG 1280×1024 | 10 FPS | 454 KiB | 37 Mbit/s |
+| Station → robot | Path / waypoints | On change | JSON | Negligible |
+| Robot → station | Video, thermal, audio, status | TBD | TBD | **Unbudgeted** |
+| Station → rescue team | Victim location and status | On detection | JSON | Negligible |
+
+Those two drone streams come to 71 Mbit/s, leaving 29 for the robot and the operator UI. That fits,
+but only just, and the robot's contribution is still unknown.
+
+## Message formats
+
+| Field | State | Note |
+| --- | --- | --- |
+| Frame container | Proposed | One JPEG per frame, filename carrying the timestamp. |
+| Detection output | Agreed | JSON, `[{"image", "bbox_xyxy", "conf"}]`, as written by `src/detection/detect.py:16`. |
+| Coordinate frame | Open | Whether `bbox_xyxy` is in image pixels or in ground metres. Pixels today. |
+| Transport | Open | Plain TCP, HTTP, or a stream protocol. |
+| Timing | Open | No frame timestamp in the payload, so latency is unmeasurable. |
+| Loss behaviour | Open | What the station does with a dropped frame. |
+
+Nothing carries a timestamp yet, and `detect.py` writes results to a file rather than a socket, so
+no transport exists. This starts when the drone is chosen. Links involving the robot must be
+reviewed by the Robotics team.
+
 ## Setup
 
 The station laptop is the access point. Drone, robot and the operator's phone are clients on one

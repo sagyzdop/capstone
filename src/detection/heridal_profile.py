@@ -1,12 +1,12 @@
 """Profile of the HERIDAL dataset (Roboflow "Heridal Human Detection" v4, COCO export, 640x640 stretched).
 
 Usage:
-    python src/detection/heridal_profile.py [DATASET_ROOT] [--out station/assets/heridal]
+    python src/detection/heridal_profile.py [DATASET_ROOT] [--out research/datasets/assets/heridal]
 
 DATASET_ROOT holds train/ valid/ test/, each with _annotations.coco.json (default: data/raw/heridal-roboflow).
 
 Outputs (in --out):
-    summary.json    all aggregate statistics quoted in station/heridal-profile.md
+    summary.json    all aggregate statistics quoted in research/datasets/heridal-profile.md
     images.csv      one row per image  (split, location code, counts, contrast, sharpness, crowding, ...)
     persons.csv     one row per annotation (size, local contrast, nearest-neighbour distance, ...)
     *.png           plots and example montages
@@ -41,7 +41,7 @@ ORIG_W, ORIG_H = 4000, 3000
 
 ap = argparse.ArgumentParser()
 ap.add_argument("root", nargs="?", default="data/raw/heridal-roboflow")
-ap.add_argument("--out", default="station/assets/heridal")
+ap.add_argument("--out", default="research/datasets/assets/heridal")
 args = ap.parse_args()
 ROOT = os.path.abspath(args.root)
 OUT = FIG = os.path.abspath(args.out)

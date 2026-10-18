@@ -23,5 +23,5 @@ TBD: language, dependencies, how to run.
 
 ## Conventions
 
-- Code follows the links in [docs/interfaces.md](../docs/interfaces.md).
+- Code follows the links in [research/communication/](../research/communication/).
 - Large data and model weights stay out of git (see `.gitignore`).

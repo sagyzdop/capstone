@@ -2,7 +2,7 @@
 
 The 29 KMeans background clusters (seed 0) were inspected visually via cluster_sheet_*.png and each was
 assigned to one scene type below. Usage:
-    python src/detection/heridal_scenes.py [--out station/assets/heridal]
+    python src/detection/heridal_scenes.py [--out research/datasets/assets/heridal]
 Reads OUT/images.csv, writes OUT/scene_types.json.
 """
 import argparse
@@ -32,7 +32,7 @@ CLUSTER_TO_SCENE = {
 }
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--out", default="station/assets/heridal")
+ap.add_argument("--out", default="research/datasets/assets/heridal")
 OUT = os.path.abspath(ap.parse_args().out)
 rows = list(csv.DictReader(open(os.path.join(OUT, "images.csv"), encoding="utf-8")))
 assert set(int(r["km_fine"]) for r in rows) == set(CLUSTER_TO_SCENE), "cluster ids changed - relabel"

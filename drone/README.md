@@ -14,7 +14,7 @@ A sensing platform that flies to a point, hovers, and streams to the station. No
 
 ## Interfaces
 
-See [docs/interfaces.md](../docs/interfaces.md).
+See [research/communication/](../research/communication/).
 
 ## Constraints
 

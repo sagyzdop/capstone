@@ -1,8 +1,8 @@
-"""Extra checks quoted in station/heridal-profile.md that heridal_profile.py does not print: location mix of the
+"""Extra checks quoted in research/datasets/heridal-profile.md that heridal_profile.py does not print: location mix of the
 metric extremes, share of fully grouped images (CCR = 1), and sensitivity of the near-duplicate count to the
 dHash threshold.
 
-Usage: python src/detection/heridal_checks.py [DATASET_ROOT] [--out station/assets/heridal]
+Usage: python src/detection/heridal_checks.py [DATASET_ROOT] [--out research/datasets/assets/heridal]
 Reads OUT/images.csv and OUT/persons.csv (produced by heridal_profile.py); prints to stdout.
 """
 import argparse
@@ -15,7 +15,7 @@ import numpy as np
 
 ap = argparse.ArgumentParser()
 ap.add_argument("root", nargs="?", default="data/raw/heridal-roboflow")
-ap.add_argument("--out", default="station/assets/heridal")
+ap.add_argument("--out", default="research/datasets/assets/heridal")
 args = ap.parse_args()
 ROOT, OUT = os.path.abspath(args.root), os.path.abspath(args.out)
 imgs = list(csv.DictReader(open(os.path.join(OUT, "images.csv"), encoding="utf-8")))

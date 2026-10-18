@@ -2,7 +2,7 @@
 
 > **Status:** Draft · **Updated:** 2026-10-18
 
-This analysis covers the **downloaded** datasets: HIT-UAV (thermal), C2A (RGB, synthetic disaster) and the WiSARD sample (paired RGB + thermal, real search-and-rescue). For each one it asks whether it suits a hovering drone with **both RGB and infrared (IR) cameras** looking for victims after an earthquake. It covers person quality, density, size, downscaling, image quality, coverage, data leakage, how RGB and IR combine, and which models fit.
+This analysis covers the **downloaded** datasets: HIT-UAV (thermal), C2A (RGB, synthetic disaster), the WiSARD sample (paired RGB + thermal, real search-and-rescue) and HERIDAL (real RGB search-and-rescue). For each one it asks whether it suits a hovering drone with **both RGB and infrared (IR) cameras** looking for victims after an earthquake. It covers person quality, density, size, downscaling, image quality, coverage, data leakage, how RGB and IR combine, and which models fit.
 
 No model was trained. All model numbers come from inference only, using existing weights:
 - `best.pt`: YOLO11n trained earlier on HIT-UAV for 14 of 50 planned epochs.
@@ -15,9 +15,10 @@ No model was trained. All model numbers come from inference only, using existing
 | **HIT-UAV** (thermal) | Training the thermal detector | Judging real-world performance alone | No disaster scenes; 60–130 m altitude is higher than we will hover; daytime persons barely stand out; 31% of val/test images are near-duplicates of train images |
 | **C2A** (RGB) | RGB pre-training and pose variety (19% lying) | Any reported metric: its splits leak | 98% of val/test background scenes also appear in train; persons are pasted at a fixed 4–24 px whatever the image scale; 35% are under 8 px; no images without persons |
 | **WiSARD sample** (RGB + IR) | A real-world sanity check; measuring RGB–IR geometry | Training or benchmarking | One flight, the same 4 actors, 264 frames |
+| **HERIDAL** (RGB) | Real RGB evaluation after re-splitting by location; 561 hard negatives | Reporting metrics on the shipped split; training at 640 | 44% of test images have a train twin; the smallest persons of any set (median 11 px side); the Roboflow export stretch-discards about 97% of each person's pixels |
 
 Key numbers:
-- Thermal persons are a **tiny-object problem**: median 15–17 px.
+- Persons are a **tiny-object problem**: median 15–17 px on thermal, and 11 px side in HERIDAL RGB.
 - Thermal downscaling floor is **480 px**: AP50 0.87 at 640, 0.84 at 480, 0.66 at 320.
 - On 4K RGB, **tiling raised AP50 about 10×** (0.03 → 0.32) compared with resizing to 640.
 - The HIT-UAV model **does not transfer** to real wilderness thermal footage: AP50 0.87 on its own test set, 0.01 on WiSARD IR.
@@ -40,20 +41,20 @@ Definitions:
 
 ## 2. Snapshot
 
-| | HIT-UAV | C2A | WiSARD IR | WiSARD RGB |
-| --- | --- | --- | --- | --- |
-| Modality | Thermal, 8-bit grey | RGB | Thermal, 8-bit grey | RGB |
-| Images (train / val / test) | 2,029 / 290 / 579 | 6,129 / 2,043 / 2,043 | 264 (eval) | 264 (eval) |
-| Persons | 12,312 | 360,467 | 1,006 | 1,022 |
-| Resolution | 640×512 (all) | 230–4000 px, median long side 428 | 640×512 | 3840×2160 |
-| Images with no person | **41.6%** | **0%** | 1.1% | 1.1% |
-| Persons per image, median (p95, max) | 2 (16, 33) | 34 (49, 240) | 4 (4, 4) | 4 (4, 4) |
-| Person px p5 / p50 / p95 | 9.9 / 14.9 / 24.4 | 3.5 / 12.0 / 23.2 | 13.3 / 17.2 / 24.9 | 49.3 / 66.7 / 105.0 |
-| Persons < 8 px (native) | 0.5% | **34.6%** | 0% | 0% |
-| Low-contrast persons | 25.7% | 68.2%* | 2.9% | 88.6%* |
-| Overlapping another person | 19.4% | 5.1% | 23.0% | 23.1% |
-| Val/test near-duplicates of train | **31%** | **72%** | n/a | n/a |
-| License | CC0 | unclear | permissive notice | permissive notice |
+| | HIT-UAV | C2A | WiSARD IR | WiSARD RGB | HERIDAL |
+| --- | --- | --- | --- | --- | --- |
+| Modality | Thermal, 8-bit grey | RGB | Thermal, 8-bit grey | RGB | RGB |
+| Images (train / val / test) | 2,029 / 290 / 579 | 6,129 / 2,043 / 2,043 | 264 (eval) | 264 (eval) | 1,258 / 220 / 101 |
+| Persons | 12,312 | 360,467 | 1,006 | 1,022 | 3,073 |
+| Resolution | 640×512 (all) | 230–4000 px, median long side 428 | 640×512 | 3840×2160 | 640×640, stretched |
+| Images with no person | **41.6%** | **0%** | 1.1% | 1.1% | 35.5% |
+| Persons per image, median (p95, max) | 2 (16, 33) | 34 (49, 240) | 4 (4, 4) | 4 (4, 4) | 1 (8, 35) |
+| Person px p5 / p50 / p95 | 9.9 / 14.9 / 24.4 | 3.5 / 12.0 / 23.2 | 13.3 / 17.2 / 24.9 | 49.3 / 66.7 / 105.0 | 6.8 / 11.2 / 17.7 |
+| Persons < 8 px (native) | 0.5% | **34.6%** | 0% | 0% | **13.6%** |
+| Low-contrast persons | 25.7% | 68.2%* | 2.9% | 88.6%* | 70.0%* |
+| Overlapping another person | 19.4% | 5.1% | 23.0% | 23.1% | 7.5% |
+| Val/test near-duplicates of train | **31%** | **72%** | n/a | n/a | **44%** |
+| License | CC0 | unclear | permissive notice | permissive notice | CC BY 4.0 (Roboflow) / CC BY 3.0 (Zenodo) |
 
 \* RGB low contrast is in grey level only; colour often still separates people (see §3).
 
@@ -232,6 +233,11 @@ The camera specs are **assumptions**; replace them with the real drone's specs. 
    - 148 "DontCare" boxes in 103 images are dropped by `prepare.py`, so those regions train as background. This is small (1.2% of person count), but ambiguous people may be among them.
    - The rainy flag is never used.
 4. **C2A pose file:** pose labels sit in a separate folder. All 360k persons matched a pose, so the files line up.
+5. **HERIDAL splits leak.**
+   - 44 of the 101 test images (44%) have a near-identical frame in train or valid, from 360 cross-split near-duplicate pairs. The test-only codes MOB and GRO show the same scenes as BLA and GOR, which are in train.
+   - Stable across thresholds: at dHash ≤ 30 / 40 / 50 there are 317 / 360 / 405 pairs and 42 / 44 / 46 test images with a twin.
+   - **Split by location code**, or report on the 57 test images without a twin.
+   - The test split is also unrepresentative: no empty images, 3.34 persons per image against 1.96 in train, and no shrubland or snow.
 
 ## 10. Combining infrared and RGB
 
@@ -272,8 +278,8 @@ Fusion options:
 | Late-fusion ensemble (weighted box fusion) | Uses both cameras without paired training data | Needs camera calibration |
 
 Training implications from the data (for later):
-- Keep negative images, and add rubble with no people as hard negatives (needed for C2A).
-- Re-split C2A by scene.
+- Keep negative images, and add rubble with no people as hard negatives (needed for C2A). HERIDAL's 561 empty frames are real hard negatives.
+- Re-split C2A by scene, and HERIDAL by location code.
 - Normalise thermal look across sensors (histogram equalisation or AGC-style augmentation, blur and sharpen jitter) to close the HIT-UAV → WiSARD gap.
 - Keep night and day balance, and report metrics per condition.
 - Always report a cross-dataset score (WiSARD) next to the in-domain one.
@@ -283,7 +289,8 @@ Training implications from the data (for later):
 1. **Thermal:** train on HIT-UAV, re-split by flight sequence. Evaluate on HIT-UAV test **and** WiSARD IR, and report both.
 2. **RGB:** pre-train on C2A, re-split by scene, with persons under 4 px dropped or ignored. Evaluate on WiSARD RGB with tiling.
 3. **Fusion:** calibrate the drone's RGB↔IR mapping on our own hardware. Late fusion first.
-4. **Fill the gap:** no downloaded set has real people in real rubble, lying or partly covered. Record our own staged clips (actors lying on rubble or a construction site, day and night, 20–60 m, both cameras). Even 200–500 labelled frames would be the most valuable evaluation set. Next downloads in priority order: full WiSARD (paired RGB-T), HERIDAL (real RGB search and rescue).
+4. **HERIDAL:** its people are the smallest of any set (median 126 px², 11 px side) and 14% are under 8×8, so it needs `imgsz` ≥ 1280 or tiling, a P2 head, priors of 6 to 20 px, and copy-paste onto its empty backgrounds. Re-split by location code first. Prefer the Zenodo originals for evaluation if bandwidth allows: tiling the full 4000×3000 frames keeps about 29× more pixels per person than the 640×640 export. Report per scene type, since ZRI holds 42% of persons and maquis and snow have no test images.
+5. **Fill the gap:** no downloaded set has real people in real rubble, lying or partly covered. Record our own staged clips (actors lying on rubble or a construction site, day and night, 20–60 m, both cameras). Even 200–500 labelled frames would be the most valuable evaluation set. Next download in priority order: full WiSARD (paired RGB-T).
 
 ## Reproduce
 

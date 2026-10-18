@@ -13,6 +13,34 @@ Entry template:
 - ...
 -->
 
+## 2026-10-18 — Fold the HERIDAL profile into the dataset docs
+
+### Changed
+- **`heridal-profile.md` removed; its content merged where it already belonged.**
+  - The eight metric points, the at-a-glance column and the caveats → [research/datasets/dataset-profiles.md](research/datasets/dataset-profiles.md) §5, beside the four datasets measured the same way.
+  - The split leak → [dataset-suitability.md](research/datasets/dataset-suitability.md) §9, with the C2A and HIT-UAV leaks.
+  - The training recommendations → the same file's §12 data plan, which already listed HERIDAL as a future download.
+  - The Roboflow-versus-Zenodo note → [datasets.md](research/datasets/datasets.md), where the copy is recorded.
+
+Rationale: a fifth dataset measured on the same eight points is a section in the profiles document, not a separate file. The verdicts were the only part that did not fit, and dataset-suitability.md is where verdicts live.
+
+## 2026-10-18 — Dissolve docs/
+
+### Changed
+- **`docs/` removed; its content moved rather than duplicated.**
+  - ConOps sequence diagram and scope list → [README.md](README.md). The problem and approach prose was already there.
+  - Station-internal diagram → [station/README.md](station/README.md). The component table and data-flow list duplicated [research/communication/](research/communication/).
+  - Rates, message formats and now coverage → [research/communication/](research/communication/), alongside the link budget they depend on.
+  - Assumptions → [open-questions.md](open-questions.md) as a second section. Rationale: a question and an assumption are both unverified, and they are looked up together.
+- **README repository map and the conventions block** updated for the new locations, including a new rule to log assumptions alongside questions.
+
+### Decided
+- **RGB drops to 1280×1024; 4K is cut.** Rationale: coverage is 2·altitude·tan(HFOV/2), which has no sensor width in it, so a 1280 camera sees exactly what a 4K camera sees. What resolution buys is hover altitude, and 1280 already reaches the 8 px detection floor at 49 m, the same as thermal. 4K cost 4× the bytes and 40× the detector time to reach an altitude the drone was never going to use.
+- **"The drone hovers at a fixed point" is now contested.** Rationale: a hover covers 0.068 ha at 40 m and never grows, while a 2 m/s sweep covers 1.4 ha in two minutes. The pivot assumed a hover; the coverage maths prefers a sweep. Recorded as a blocking open question and marked "Agreed, now contested" rather than silently rewritten.
+
+### Added to open questions
+- Hover or sweep, and how the remaining 29 Mbit/s splits between the robot stream and the operator UI. Both blocking.
+
 ## 2026-10-18 — Interfaces, and the bandwidth that does not fit
 
 ### Decided
@@ -20,7 +48,7 @@ Entry template:
 - **Detection output stays as it is.** `[{"image", "bbox_xyxy", "conf"}]`, already written by `src/detection/detect.py:16`.
 
 ### Added
-- Rates and message formats in [docs/interfaces.md](docs/interfaces.md), replacing "TBD". Frame rates are the measured detector limits, byte counts come from the re-encoded SAR imagery.
+- Rates and message formats in [research/communication/](research/communication/), replacing "TBD". Frame rates are the measured detector limits, byte counts come from the re-encoded SAR imagery.
 
 ### Added to open questions
 - The drone streams exceed the link. Thermal at 30 FPS is 34 Mbit/s and RGB at 10 FPS is 37; adding 4K reaches 101, the whole 100 Mbit/s budget, leaving nothing for the robot or the operator. Three options are set out in the interfaces doc. Blocking, since the team picks the streams.
@@ -49,7 +77,7 @@ Entry template:
 ## [Unreleased]
 
 ### Added
-- HERIDAL profile in [station/heridal-profile.md](station/heridal-profile.md) (`src/detection/heridal_profile.py`), on the Roboflow 640×640 export. Same eight points as the other profiles, with an at-a-glance row in the audit.py metric definitions. Findings: 44 of 101 test images have a near-duplicate in train/valid, people are the smallest of all sets (median 126 px²), 70% are low-contrast in grey level, 35.5% of frames are empty, 11 scene types.
+- HERIDAL profile in [research/datasets/dataset-profiles.md](research/datasets/dataset-profiles.md) §5 (`src/detection/heridal_profile.py`), on the Roboflow 640×640 export. Same eight points as the other profiles, with an at-a-glance row in the audit.py metric definitions. Findings: 44 of 101 test images have a near-duplicate in train/valid, people are the smallest of all sets (median 126 px²), 70% are low-contrast in grey level, 35.5% of frames are empty, 11 scene types. Verdicts in [dataset-suitability.md](research/datasets/dataset-suitability.md) §9, §12.
 - Per-dataset profiles in [research/datasets/dataset-profiles.md](research/datasets/dataset-profiles.md): size, distinct backgrounds (`src/detection/backgrounds.py`), persons per image, pixels per person, contrast, sharpness and crowding, each as mean + percentiles.
 - Dataset suitability audit in [research/datasets/dataset-suitability.md](research/datasets/dataset-suitability.md) (`src/detection/audit.py`, `src/detection/eval_sizes.py`). Findings: C2A val/test leak (98% of scenes shared with train), HIT-UAV flag 1 = night, thermal model does not transfer to WiSARD IR (AP50 0.87 → 0.01), tiling is required for 4K RGB, RGB↔IR alignment supports late fusion only.
 
@@ -69,7 +97,7 @@ Entry template:
 - **The station is the orchestrator and the only compute node.** All processing (detection, path planning, orchestration) runs on the station laptop. Rationale: _to be added by the team_.
 - **No processing runs on the drone.** It only senses and streams. The "processes the data, locates and tags a victim" step in the scenario diagram happens on the station.
 - **The station is also stationary.** "Moving station" means a vehicle carrying laptop, drone and robot drives to a predefined location, then stays there.
-- **Victim-location prior comes from cellular data.** Rescue teams request last-known-location data of phones in the area from mobile carriers (CDR / cell site analysis) to choose where to go. See [docs/assumptions.md](docs/assumptions.md).
+- **Victim-location prior comes from cellular data.** Rescue teams request last-known-location data of phones in the area from mobile carriers (CDR / cell site analysis) to choose where to go. See [open-questions.md](open-questions.md).
 - **The robot's drop point is known** in advance.
 - **The ground robot is a spherical "tumbleweed" rolling robot**, built by the Robotics team.
 
