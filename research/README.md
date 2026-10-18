@@ -8,10 +8,12 @@
 | --- | --- |
 | [literature/](literature/) | `references.bib` (single source of truth for citations), per-paper notes in `notes/`, the literature review CSV |
 | [datasets/](datasets/) | Candidate list in [datasets.md](datasets/datasets.md), plus the analysis, charts and PDFs behind it |
+| [communication/](communication/) | Link budget: supported resolutions, frame rates, range, WiFi setup, model choice |
 
 - Add every source to [literature/references.bib](literature/references.bib).
 - Write one note per paper in [literature/notes/](literature/notes/), named by citekey, using [../templates/literature-note.md](../templates/literature-note.md).
 - Candidate datasets go in [datasets/datasets.md](datasets/datasets.md).
+- Link budget calculations go in [communication/](communication/). Mark hardware-dependent numbers `?` until measured.
 
 ## Literature
 
