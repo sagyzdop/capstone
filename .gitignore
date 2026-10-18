@@ -18,3 +18,7 @@ paper/*.synctex.gz
 
 # os
 .DS_Store
+
+# training outputs
+runs/
+*.pt
