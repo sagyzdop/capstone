@@ -16,6 +16,7 @@ Entry template:
 ## [Unreleased]
 
 ### Added
+- Per-dataset profiles in [station/dataset-profiles.md](station/dataset-profiles.md): size, distinct backgrounds (`src/detection/backgrounds.py`), persons per image, pixels per person, contrast, sharpness and crowding, each as mean + percentiles.
 - Dataset suitability audit in [station/dataset-suitability.md](station/dataset-suitability.md) (`src/detection/audit.py`, `src/detection/eval_sizes.py`). Findings: C2A val/test leak (98% of scenes shared with train), HIT-UAV flag 1 = night, thermal model does not transfer to WiSARD IR (AP50 0.87 → 0.01), tiling is required for 4K RGB, RGB↔IR alignment supports late fusion only.
 
 ## 2026-10-15 — Detection datasets shortlisted

@@ -55,6 +55,14 @@ def local_contrast(integral, std, W, H, x0, y0, x1, y1):
     return (inner - ring) / max(std, 1e-6)
 
 
+def person_sharpness(gray, x0, y0, x1, y1):
+    """Laplacian variance of the box grown by 25% per side, native resolution (edges of the body included)."""
+    H, W = gray.shape
+    px, py = max(1, (x1 - x0) // 4), max(1, (y1 - y0) // 4)
+    crop = gray[max(0, y0 - py):min(H, y1 + py), max(0, x0 - px):min(W, x1 + px)]
+    return float(cv2.Laplacian(crop, cv2.CV_64F).var()) if min(crop.shape) >= 3 else float("nan")
+
+
 def iou_any(boxes):
     """Per box: does it overlap any other box (IoU > 0)?"""
     b = np.array(boxes)
@@ -67,6 +75,18 @@ def iou_any(boxes):
     inter = (x1 > x0) & (y1 > y0)
     np.fill_diagonal(inter, False)
     return inter.any(1)
+
+
+def neighbours(boxes, k=3):
+    """Per box: how many other person centres lie within k of this box's sizes."""
+    b = np.array(boxes, float)
+    if len(b) < 2:
+        return np.zeros(len(b), int)
+    c = np.stack([(b[:, 0] + b[:, 2]) / 2, (b[:, 1] + b[:, 3]) / 2], 1)
+    d = np.linalg.norm(c[:, None] - c[None], axis=2)
+    np.fill_diagonal(d, np.inf)
+    size = np.sqrt((b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1]))
+    return (d < k * np.maximum(size, 1)[:, None]).sum(1)
 
 
 def nn_gap(boxes):
@@ -122,7 +142,7 @@ def audit(name):
                 x1, y1 = min(W, max(x0 + 1, int(round((xc + bw / 2) * W)))), min(H, max(y0 + 1, int(round((yc + bh / 2) * H))))
                 boxes.append((x0, y0, x1, y1))
             pose_list = poses(p.stem) if name == "c2a" else []
-            overlap, gap = iou_any(boxes), nn_gap(boxes)
+            overlap, gap, nb3 = iou_any(boxes), nn_gap(boxes), neighbours(boxes)
             m = meta(name, p.stem)
             for i, (x0, y0, x1, y1) in enumerate(boxes):
                 xc, yc, bw, bh = rows[i]
@@ -132,7 +152,9 @@ def audit(name):
                     "cx": xc, "cy": yc, "stem": p.stem,
                     "edge": x0 <= 1 or y0 <= 1 or x1 >= W - 1 or y1 >= H - 1,
                     "contrast": float(local_contrast(integral, std, W, H, x0, y0, x1, y1)),
-                    "overlap": bool(overlap[i]), "nn_gap": float(gap[i]),
+                    "sharpness": person_sharpness(gray, x0, y0, x1, y1),
+                    "sharpness_640": person_sharpness(g_small, *(round(v * k) for v in (x0, y0, x1, y1))),
+                    "overlap": bool(overlap[i]), "nn_gap": float(gap[i]), "nb3": int(nb3[i]),
                     "pose": pose_list[i] if i < len(pose_list) else None, **m,
                 })
             imgs.append({
@@ -147,6 +169,13 @@ def audit(name):
 
 def pct(a, qs=(5, 25, 50, 75, 95)):
     return [round(float(v), 2) for v in np.percentile(a, qs)] if len(a) else []
+
+
+def dist(a):
+    """Mean plus 5/25/50/75/95th percentiles, NaN/inf dropped."""
+    a = np.asarray(a, float)
+    a = a[np.isfinite(a)]
+    return {"mean": round(float(a.mean()), 2), **dict(zip(["p5", "p25", "p50", "p75", "p95"], pct(a)))} if len(a) else {}
 
 
 def near_dups(imgs, max_bits=4):
@@ -201,6 +230,21 @@ def summarize(name, imgs, persons):
         "low_contrast_pct": round(float((np.abs(contrast) < 0.5).mean() * 100), 1),
         "quality": {k: pct([im[k] for im in imgs]) for k in ["brightness", "contrast_rms", "dyn_range", "sharpness"]},
         "near_dup_with_train": near_dups(imgs),
+        "profile": {  # mean + percentiles for the per-dataset write-up
+            "megapixels": dist([im["W"] * im["H"] / 1e6 for im in imgs]),
+            "persons_per_image": dist(n),
+            "persons_per_positive_image": dist(n[n > 0]),
+            "person_area_px": dist([p["w"] * p["h"] for p in persons]),
+            "person_side_px": dist(size),
+            "person_contrast": dist(contrast),
+            "person_abs_contrast": dist(np.abs(contrast)),
+            "image_rms_contrast": dist([im["contrast_rms"] for im in imgs]),
+            "person_sharpness": dist([p["sharpness"] for p in persons]),
+            "person_sharpness_640": dist([p["sharpness_640"] for p in persons]),
+            "image_sharpness_640": dist([im["sharpness"] for im in imgs]),
+            "nn_gap": dist(gap),
+            "neighbours_within_3": dist([p["nb3"] for p in persons]),
+        },
     }
     if name == "hit-uav":
         for key in ["time", "altitude_m", "angle_deg", "weather"]:
@@ -575,6 +619,8 @@ if __name__ == "__main__":
     g = np.zeros((10, 10)); g[4:6, 4:6] = 10
     I = cv2.integral(g)
     assert box_mean(I, 4, 4, 6, 6) == 10 and local_contrast(I, g.std(), 10, 10, 4, 4, 6, 6) > 0
+    assert neighbours([(0, 0, 2, 2), (2, 0, 4, 2), (50, 50, 52, 52)]).tolist() == [1, 1, 0]
+    assert dist([1, 2, 3, np.inf])["mean"] == 2
     assert iou_any([(0, 0, 2, 2), (1, 1, 3, 3), (5, 5, 6, 6)]).tolist() == [True, True, False]
     assert meta("hit-uav", "1_130_90_0_04077") == {"time": "night", "altitude_m": 130, "angle_deg": 90, "weather": "sunny"}
     assert meta("c2a", "collapsed_building_image0001_3")["disaster"] == "collapsed_building"
