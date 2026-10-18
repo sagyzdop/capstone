@@ -1,0 +1,98 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 264,
+  "persons": 1022,
+  "ap": 0.03,
+  "precision": 0.636,
+  "recall": 0.007,
+  "recall_by_size": {
+   "32-64": {
+    "n": 447,
+    "recall": 0.0
+   },
+   "64-1e+09": {
+    "n": 575,
+    "recall": 0.012
+   }
+  },
+  "ms_per_image_median": 48.1,
+  "model": "yolo11n.pt",
+  "dataset": "wisard-vis",
+  "split": "val"
+ },
+ {
+  "imgsz": 1280,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 264,
+  "persons": 1022,
+  "ap": 0.127,
+  "precision": 0.552,
+  "recall": 0.036,
+  "recall_by_size": {
+   "32-64": {
+    "n": 447,
+    "recall": 0.025
+   },
+   "64-1e+09": {
+    "n": 575,
+    "recall": 0.045
+   }
+  },
+  "ms_per_image_median": 56.7,
+  "model": "yolo11n.pt",
+  "dataset": "wisard-vis",
+  "split": "val"
+ },
+ {
+  "imgsz": 1920,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 264,
+  "persons": 1022,
+  "ap": 0.132,
+  "precision": 0.54,
+  "recall": 0.066,
+  "recall_by_size": {
+   "32-64": {
+    "n": 447,
+    "recall": 0.114
+   },
+   "64-1e+09": {
+    "n": 575,
+    "recall": 0.028
+   }
+  },
+  "ms_per_image_median": 72.5,
+  "model": "yolo11n.pt",
+  "dataset": "wisard-vis",
+  "split": "val"
+ },
+ {
+  "imgsz": 640,
+  "tile": 640,
+  "iou": 0.5,
+  "images": 264,
+  "persons": 1022,
+  "ap": 0.324,
+  "precision": 0.649,
+  "recall": 0.356,
+  "recall_by_size": {
+   "32-64": {
+    "n": 447,
+    "recall": 0.591
+   },
+   "64-1e+09": {
+    "n": 575,
+    "recall": 0.174
+   }
+  },
+  "ms_per_image_median": 494.0,
+  "model": "yolo11n.pt",
+  "dataset": "wisard-vis",
+  "split": "val"
+ }
+]

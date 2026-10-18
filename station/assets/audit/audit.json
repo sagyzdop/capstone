@@ -1,0 +1,715 @@
+{
+ "hit-uav": {
+  "modality": "thermal",
+  "images": 2898,
+  "splits": {
+   "test": 579,
+   "train": 2029,
+   "val": 290
+  },
+  "persons": 12312,
+  "negatives_pct": 41.6,
+  "persons_per_image": {
+   "mean": 4.25,
+   "pcts": [
+    0.0,
+    0.0,
+    2.0,
+    7.0,
+    16.0
+   ],
+   "max": 33
+  },
+  "density_buckets_pct": {
+   "0": 41.6,
+   "1": 8.1,
+   "2-5": 19.7,
+   "6-20": 27.0,
+   ">20": 3.6
+  },
+  "resolutions_top": [
+   [
+    "640x512",
+    2898
+   ]
+  ],
+  "grayscale_pct": 100.0,
+  "size_px_pcts": [
+   10.25,
+   12.85,
+   15.43,
+   18.97,
+   24.66
+  ],
+  "size_bins_pct": {
+   "0-8": 0.4,
+   "8-12": 15.5,
+   "12-16": 39.3,
+   "16-24": 38.7,
+   "24-32": 5.8,
+   "32-64": 0.3,
+   "64-1e+09": 0.0
+  },
+  "rel_area_pct_median": 0.0726,
+  "aspect_wh_pcts": [
+   0.38,
+   0.5,
+   0.61,
+   0.8,
+   1.14
+  ],
+  "elongated_pct": 59.2,
+  "edge_truncated_pct": 4.3,
+  "overlapping_pct": 19.4,
+  "nn_gap_lt2_pct": 53.3,
+  "nn_gap_pcts": [
+   0.66,
+   1.11,
+   1.82,
+   3.73,
+   12.02
+  ],
+  "contrast_pcts": [
+   -0.05,
+   0.46,
+   0.9,
+   1.37,
+   2.53
+  ],
+  "low_contrast_pct": 25.7,
+  "quality": {
+   "brightness": [
+    102.04,
+    116.66,
+    126.08,
+    135.79,
+    153.08
+   ],
+   "contrast_rms": [
+    16.93,
+    26.52,
+    34.49,
+    44.25,
+    59.87
+   ],
+   "dyn_range": [
+    77.0,
+    118.25,
+    143.0,
+    177.0,
+    212.0
+   ],
+   "sharpness": [
+    19.64,
+    34.55,
+    49.97,
+    64.35,
+    122.53
+   ]
+  },
+  "near_dup_with_train": {
+   "test": 0.314,
+   "val": 0.31
+  },
+  "by_time": {
+   "day": {
+    "images": 917,
+    "persons": 2739,
+    "median_px": 16.3,
+    "median_contrast": 0.23,
+    "brightness_median": 124.8
+   },
+   "night": {
+    "images": 1981,
+    "persons": 9573,
+    "median_px": 15.0,
+    "median_contrast": 1.06,
+    "brightness_median": 126.2
+   }
+  },
+  "by_altitude_m": {
+   "60": {
+    "images": 863,
+    "persons": 6268,
+    "median_px": 16.4,
+    "median_contrast": 1.13,
+    "brightness_median": 125.4
+   },
+   "70": {
+    "images": 267,
+    "persons": 994,
+    "median_px": 18.4,
+    "median_contrast": 0.33,
+    "brightness_median": 132.8
+   },
+   "80": {
+    "images": 256,
+    "persons": 1316,
+    "median_px": 16.6,
+    "median_contrast": 0.44,
+    "brightness_median": 127.6
+   },
+   "90": {
+    "images": 145,
+    "persons": 429,
+    "median_px": 15.2,
+    "median_contrast": 0.61,
+    "brightness_median": 124.0
+   },
+   "100": {
+    "images": 291,
+    "persons": 811,
+    "median_px": 14.1,
+    "median_contrast": 0.6,
+    "brightness_median": 121.3
+   },
+   "110": {
+    "images": 247,
+    "persons": 833,
+    "median_px": 14.0,
+    "median_contrast": 0.74,
+    "brightness_median": 122.7
+   },
+   "120": {
+    "images": 336,
+    "persons": 663,
+    "median_px": 11.3,
+    "median_contrast": 1.03,
+    "brightness_median": 121.4
+   },
+   "130": {
+    "images": 493,
+    "persons": 998,
+    "median_px": 12.0,
+    "median_contrast": 1.08,
+    "brightness_median": 131.6
+   }
+  },
+  "by_angle_deg": {
+   "30": {
+    "images": 477,
+    "persons": 3300,
+    "median_px": 13.0,
+    "median_contrast": 0.97,
+    "brightness_median": 119.2
+   },
+   "40": {
+    "images": 339,
+    "persons": 988,
+    "median_px": 13.9,
+    "median_contrast": 0.56,
+    "brightness_median": 125.0
+   },
+   "50": {
+    "images": 486,
+    "persons": 1738,
+    "median_px": 17.3,
+    "median_contrast": 0.76,
+    "brightness_median": 127.6
+   },
+   "60": {
+    "images": 471,
+    "persons": 1648,
+    "median_px": 17.6,
+    "median_contrast": 0.72,
+    "brightness_median": 125.9
+   },
+   "70": {
+    "images": 421,
+    "persons": 1210,
+    "median_px": 17.5,
+    "median_contrast": 0.71,
+    "brightness_median": 129.9
+   },
+   "80": {
+    "images": 390,
+    "persons": 2647,
+    "median_px": 17.5,
+    "median_contrast": 1.61,
+    "brightness_median": 125.5
+   },
+   "90": {
+    "images": 314,
+    "persons": 781,
+    "median_px": 16.4,
+    "median_contrast": 0.58,
+    "brightness_median": 129.9
+   }
+  },
+  "by_weather": {
+   "sunny": {
+    "images": 2898,
+    "persons": 12312,
+    "median_px": 15.4,
+    "median_contrast": 0.9,
+    "brightness_median": 126.1
+   }
+  },
+  "altitude_x_angle_images": {
+   "60m/30deg": 183,
+   "60m/40deg": 43,
+   "60m/50deg": 164,
+   "60m/60deg": 170,
+   "60m/70deg": 144,
+   "60m/80deg": 120,
+   "60m/90deg": 39,
+   "70m/30deg": 35,
+   "70m/40deg": 38,
+   "70m/50deg": 42,
+   "70m/60deg": 41,
+   "70m/70deg": 35,
+   "70m/80deg": 37,
+   "70m/90deg": 39,
+   "80m/30deg": 31,
+   "80m/40deg": 33,
+   "80m/50deg": 40,
+   "80m/60deg": 36,
+   "80m/70deg": 43,
+   "80m/80deg": 37,
+   "80m/90deg": 36,
+   "90m/30deg": 22,
+   "90m/40deg": 18,
+   "90m/50deg": 20,
+   "90m/60deg": 22,
+   "90m/70deg": 20,
+   "90m/80deg": 25,
+   "90m/90deg": 18,
+   "100m/30deg": 48,
+   "100m/40deg": 47,
+   "100m/50deg": 43,
+   "100m/60deg": 47,
+   "100m/70deg": 34,
+   "100m/80deg": 33,
+   "100m/90deg": 39,
+   "110m/30deg": 32,
+   "110m/40deg": 33,
+   "110m/50deg": 30,
+   "110m/60deg": 40,
+   "110m/70deg": 35,
+   "110m/80deg": 38,
+   "110m/90deg": 39,
+   "120m/30deg": 33,
+   "120m/40deg": 47,
+   "120m/50deg": 45,
+   "120m/60deg": 55,
+   "120m/70deg": 52,
+   "120m/80deg": 51,
+   "120m/90deg": 53,
+   "130m/30deg": 93,
+   "130m/40deg": 80,
+   "130m/50deg": 102,
+   "130m/60deg": 60,
+   "130m/70deg": 58,
+   "130m/80deg": 49,
+   "130m/90deg": 51
+  }
+ },
+ "c2a": {
+  "modality": "rgb",
+  "images": 10215,
+  "splits": {
+   "test": 2043,
+   "train": 6129,
+   "val": 2043
+  },
+  "persons": 360467,
+  "negatives_pct": 0.0,
+  "persons_per_image": {
+   "mean": 35.29,
+   "pcts": [
+    23.0,
+    28.0,
+    34.0,
+    40.0,
+    49.0
+   ],
+   "max": 240
+  },
+  "density_buckets_pct": {
+   "0": 0.0,
+   "1": 0.0,
+   "2-5": 0.0,
+   "6-20": 1.2,
+   ">20": 98.8
+  },
+  "resolutions_top": [
+   [
+    "240x240",
+    165
+   ],
+   [
+    "300x300",
+    140
+   ],
+   [
+    "230x230",
+    125
+   ],
+   [
+    "640x360",
+    90
+   ],
+   [
+    "1280x720",
+    60
+   ]
+  ],
+  "grayscale_pct": 0.0,
+  "size_px_pcts": [
+   3.87,
+   6.32,
+   12.41,
+   21.49,
+   23.87
+  ],
+  "size_bins_pct": {
+   "0-8": 32.4,
+   "8-12": 15.6,
+   "12-16": 13.5,
+   "16-24": 35.0,
+   "24-32": 2.9,
+   "32-64": 0.4,
+   "64-1e+09": 0.1
+  },
+  "rel_area_pct_median": 0.0877,
+  "aspect_wh_pcts": [
+   0.36,
+   0.55,
+   0.83,
+   1.34,
+   2.27
+  ],
+  "elongated_pct": 53.5,
+  "edge_truncated_pct": 3.1,
+  "overlapping_pct": 5.1,
+  "nn_gap_lt2_pct": 38.1,
+  "nn_gap_pcts": [
+   0.73,
+   1.41,
+   2.72,
+   5.59,
+   15.59
+  ],
+  "contrast_pcts": [
+   -1.05,
+   -0.5,
+   -0.19,
+   0.1,
+   0.59
+  ],
+  "low_contrast_pct": 68.2,
+  "quality": {
+   "brightness": [
+    67.61,
+    95.26,
+    112.66,
+    128.28,
+    152.12
+   ],
+   "contrast_rms": [
+    24.52,
+    35.88,
+    44.78,
+    52.55,
+    64.41
+   ],
+   "dyn_range": [
+    111.0,
+    163.0,
+    192.0,
+    216.0,
+    240.0
+   ],
+   "sharpness": [
+    40.57,
+    101.74,
+    211.31,
+    466.71,
+    1620.18
+   ]
+  },
+  "near_dup_with_train": {
+   "test": 0.722,
+   "val": 0.731
+  },
+  "by_disaster": {
+   "collapsed_building": {
+    "images": 2555,
+    "persons": 92417
+   },
+   "fire": {
+    "images": 2605,
+    "persons": 89000
+   },
+   "flood": {
+    "images": 2630,
+    "persons": 89900
+   },
+   "traffic_incident": {
+    "images": 2425,
+    "persons": 89150
+   }
+  },
+  "pose_pct": {
+   "bent": 18.9,
+   "kneeling": 19.0,
+   "lying": 19.0,
+   "sitting": 18.9,
+   "upright": 24.2
+  },
+  "pose_median_px": {
+   "bent": 12.2,
+   "kneeling": 12.0,
+   "lying": 12.0,
+   "sitting": 12.0,
+   "upright": 13.4
+  },
+  "scenes_per_split": {
+   "test": 1399,
+   "train": 2018,
+   "val": 1353
+  },
+  "scenes_shared_with_train_pct": {
+   "test": 98.3,
+   "val": 98.2
+  }
+ },
+ "wisard-ir": {
+  "modality": "thermal",
+  "images": 264,
+  "splits": {
+   "val": 264
+  },
+  "persons": 1006,
+  "negatives_pct": 1.1,
+  "persons_per_image": {
+   "mean": 3.81,
+   "pcts": [
+    2.0,
+    4.0,
+    4.0,
+    4.0,
+    4.0
+   ],
+   "max": 4
+  },
+  "density_buckets_pct": {
+   "0": 1.1,
+   "1": 3.0,
+   "2-5": 95.8,
+   "6-20": 0.0,
+   ">20": 0.0
+  },
+  "resolutions_top": [
+   [
+    "640x512",
+    264
+   ]
+  ],
+  "grayscale_pct": 100.0,
+  "size_px_pcts": [
+   13.42,
+   15.2,
+   17.44,
+   20.12,
+   25.35
+  ],
+  "size_bins_pct": {
+   "0-8": 0.0,
+   "8-12": 0.8,
+   "12-16": 32.9,
+   "16-24": 59.8,
+   "24-32": 5.2,
+   "32-64": 1.3,
+   "64-1e+09": 0.0
+  },
+  "rel_area_pct_median": 0.0928,
+  "aspect_wh_pcts": [
+   0.35,
+   0.43,
+   0.57,
+   0.83,
+   1.15
+  ],
+  "elongated_pct": 58.3,
+  "edge_truncated_pct": 0.4,
+  "overlapping_pct": 23.0,
+  "nn_gap_lt2_pct": 48.6,
+  "nn_gap_pcts": [
+   0.57,
+   1.14,
+   2.06,
+   3.6,
+   6.53
+  ],
+  "contrast_pcts": [
+   0.57,
+   0.82,
+   1.12,
+   1.39,
+   1.77
+  ],
+  "low_contrast_pct": 2.9,
+  "quality": {
+   "brightness": [
+    73.59,
+    82.5,
+    86.19,
+    94.58,
+    97.38
+   ],
+   "contrast_rms": [
+    41.09,
+    41.92,
+    44.68,
+    47.08,
+    50.88
+   ],
+   "dyn_range": [
+    189.0,
+    196.0,
+    201.0,
+    203.05,
+    215.85
+   ],
+   "sharpness": [
+    244.11,
+    402.19,
+    458.81,
+    760.03,
+    801.44
+   ]
+  },
+  "near_dup_with_train": {}
+ },
+ "wisard-vis": {
+  "modality": "rgb",
+  "images": 264,
+  "splits": {
+   "val": 264
+  },
+  "persons": 1022,
+  "negatives_pct": 1.1,
+  "persons_per_image": {
+   "mean": 3.87,
+   "pcts": [
+    4.0,
+    4.0,
+    4.0,
+    4.0,
+    4.0
+   ],
+   "max": 4
+  },
+  "density_buckets_pct": {
+   "0": 1.1,
+   "1": 1.5,
+   "2-5": 97.3,
+   "6-20": 0.0,
+   ">20": 0.0
+  },
+  "resolutions_top": [
+   [
+    "3840x2160",
+    264
+   ]
+  ],
+  "grayscale_pct": 0.0,
+  "size_px_pcts": [
+   49.57,
+   57.27,
+   67.48,
+   80.41,
+   105.5
+  ],
+  "size_bins_pct": {
+   "0-8": 0.0,
+   "8-12": 0.0,
+   "12-16": 0.0,
+   "16-24": 0.0,
+   "24-32": 0.0,
+   "32-64": 43.2,
+   "64-1e+09": 56.8
+  },
+  "rel_area_pct_median": 0.0549,
+  "aspect_wh_pcts": [
+   0.36,
+   0.45,
+   0.63,
+   0.9,
+   1.11
+  ],
+  "elongated_pct": 54.5,
+  "edge_truncated_pct": 0.1,
+  "overlapping_pct": 23.1,
+  "nn_gap_lt2_pct": 49.9,
+  "nn_gap_pcts": [
+   0.56,
+   1.18,
+   2.0,
+   3.66,
+   6.56
+  ],
+  "contrast_pcts": [
+   -0.06,
+   0.08,
+   0.21,
+   0.34,
+   0.73
+  ],
+  "low_contrast_pct": 88.6,
+  "quality": {
+   "brightness": [
+    103.47,
+    107.49,
+    111.23,
+    112.93,
+    114.54
+   ],
+   "contrast_rms": [
+    48.78,
+    51.24,
+    53.18,
+    55.88,
+    58.93
+   ],
+   "dyn_range": [
+    193.0,
+    195.0,
+    203.5,
+    213.0,
+    221.0
+   ],
+   "sharpness": [
+    1045.08,
+    2657.93,
+    3729.67,
+    4355.0,
+    4399.94
+   ]
+  },
+  "near_dup_with_train": {}
+ },
+ "wisard_pairing": {
+  "frames_common": 263,
+  "frames_same_count": 247,
+  "fit_x": [
+   1.511,
+   -0.273
+  ],
+  "fit_y": [
+   1.04,
+   -0.038
+  ],
+  "residual_ir_norm_median": 0.012,
+  "residual_ir_px_median": 7.7,
+  "ir_window_in_vis_norm": [
+   0.181,
+   0.843,
+   0.036,
+   0.998
+  ],
+  "ir_footprint_share_of_vis_pct": 63.6,
+  "vis_over_ir_person_px_ratio_median": 3.91
+ }
+}
