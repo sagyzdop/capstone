@@ -1,6 +1,6 @@
 # Changelog
 
-> **Status:** Draft · **Updated:** 2026-10-04
+> **Status:** Draft · **Updated:** 2026-10-15
 
 All decisions and notable changes are recorded here, newest first. Answers to questions from [open-questions.md](open-questions.md) are recorded here too. Categories: **Decided**, **Changed**, **Added**, **Removed**.
 
@@ -15,7 +15,18 @@ Entry template:
 
 ## [Unreleased]
 
-- _Nothing yet._
+### Added
+- Per-dataset profiles in [station/dataset-profiles.md](station/dataset-profiles.md): size, distinct backgrounds (`src/detection/backgrounds.py`), persons per image, pixels per person, contrast, sharpness and crowding, each as mean + percentiles.
+- Dataset suitability audit in [station/dataset-suitability.md](station/dataset-suitability.md) (`src/detection/audit.py`, `src/detection/eval_sizes.py`). Findings: C2A val/test leak (98% of scenes shared with train), HIT-UAV flag 1 = night, thermal model does not transfer to WiSARD IR (AP50 0.87 → 0.01), tiling is required for 4K RGB, RGB↔IR alignment supports late fusion only.
+
+## 2026-10-15 — Detection datasets shortlisted
+
+### Decided
+- **Detector targets RGB and thermal.** RGB is the main path; thermal (HIT-UAV) is analysed first because it is the smallest download.
+
+### Added
+- Dataset shortlist in [literature/datasets.md](literature/datasets.md).
+- `src/detection/analyze.py`: person-size vs model input resolution analysis.
 
 ## 2026-10-04 — Pivot to a stationary, station-centric architecture
 

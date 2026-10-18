@@ -40,7 +40,7 @@ flowchart LR
 - [x] Initial architecure decided – stationary drone, tumblweed robot deployed at site, station as orchestrator
 - [ ] Concept of operations agreed by the team
 - [ ] Station–robot interface agreed with the Robotics team
-- [ ] Datasets selected
+- [x] Datasets selected – HIT-UAV (thermal), C2A (RGB); see [literature/datasets.md](literature/datasets.md)
 - [ ] Detection baseline running
 - [ ] End-to-end demo (simulated or recorded data)
 - [ ] Final report

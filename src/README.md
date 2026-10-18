@@ -1,6 +1,6 @@
 # Source Code
 
-> **Status:** Draft · **Updated:** 2026-10-04
+> **Status:** Draft · **Updated:** 2026-10-15
 
 ## Purpose
 
@@ -10,7 +10,7 @@ All project code. Nothing here yet.
 
 | Module | Component | Status |
 | --- | --- | --- |
-| Victim detection | Station | Not started |
+| [Victim detection](detection/) | Station | In progress |
 | Path planning | Station | Not started |
 | Orchestrator | Station | Not started |
 | Operator UI | Station | Not started |

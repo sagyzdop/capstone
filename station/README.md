@@ -26,4 +26,6 @@ Laptop compute budget, latency, and WiFi bandwidth: TBD.
 
 | File | Description |
 | --- | --- |
-| _none yet_ | Add detection, path-planning and orchestration docs here once they have content |
+| [detection-data-analysis.md](detection-data-analysis.md) | Person sizes vs model input size per dataset |
+| [dataset-profiles.md](dataset-profiles.md) | Per-dataset profile: size, backgrounds, persons per image, pixels per person, contrast, sharpness, crowding |
+| [dataset-suitability.md](dataset-suitability.md) | Full dataset audit: quality, density, coverage, leakage, downscaling, RGB + IR fusion, model options |
