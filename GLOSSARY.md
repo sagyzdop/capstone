@@ -28,7 +28,7 @@ scripts implement are written out in full; the rest are one line each.
 | --- | --- |
 | CDR | Call Detail Record. Carrier log of network events, including which cell tower a phone used. |
 | Cell site analysis | Estimating a phone's location from the towers and sectors it attached to. Narrows the search area rather than pinpointing anyone. |
-| Candidate zone | The area returned by carrier data before deployment. Where the vehicle drives. |
+| Candidate zone | The area returned by carrier data before deployment. A cell sector, so hundreds of metres to kilometres across. The vehicle drives there and an operator narrows it to a specific collapse site before the drone flies. |
 
 ## Sensing and datasets
 
@@ -93,6 +93,9 @@ How the analysis scripts compute these, from
 | GSD | Ground sampling distance: 2 · altitude · tan(HFOV / 2) ÷ image width. Metres of ground per pixel. |
 | HFOV | Horizontal field of view, the camera's angular width. |
 | Altitude | Height above ground (AGL) while hovering. |
+| Coverage | The ground area one frame images, 2·altitude·tan(HFOV/2) across. It has no sensor width in it, so a 1280 camera and a 4K camera with the same lens cover the same ground. |
+| Square kilometre (km²) | 1,000,000 m². Coverage figures use this unit: one hover at 40 m is 0.0025 km², a two-minute sweep 0.014 km², an urban cell sector about 28 km². Everyday landmarks stay in m², since a tennis court is 0.0003 km². |
+| Swath | The width of ground a moving drone covers in one pass, equal to the frame width. |
 | JPEG | Lossy image compression. Our transmitted format; quality 85 throughout. |
 | Tiling vs resize | Resizing throws away detail; tiling keeps native pixels. On 4K RGB, tiling scores AP50 0.324 against 0.030 for resizing to 640. |
 

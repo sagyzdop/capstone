@@ -4,10 +4,10 @@
 
 What the station can send, how fast, and how far, with numbers the team can design against.
 
-Every resolution from 128×128 to 3840×2160 transmits. What changes with resolution is detector
-throughput rather than the radio, so the working streams are 640×512 thermal at 30 FPS and
-1280×1024 RGB at 10 FPS. YOLO11n at 640 is the detector for both. The station is the access point,
-so the operator's phone joins as a third client without extra hardware.
+Two streams: 640×512 thermal at 30 FPS and 1280×1024 RGB at 10 FPS, both run through YOLO11n at
+640 input. Higher resolutions transmit fine and buy nothing, because coverage is set by field of
+view and altitude rather than sensor width. The station is the access point, so the operator's
+phone joins as a third client without extra hardware.
 
 Radiation is not the limiting factor: 100 Mbit/s holds to about 348 m, and the working range is 20
 to 120 m. Rubble is what ends the link, costing 10 to 30 dB for one dense concrete wall.
@@ -23,15 +23,15 @@ pessimistic number leaves room for a degraded link.
 times are `ms_per_image_median` from [assets/audit/eval/](../datasets/assets/audit/eval/), measured
 on an M4.
 
-| Resolution | Bytes | Send @100 Mb/s | Detects at | FPS ceiling | Use it for |
-| --- | --- | --- | --- | --- | --- |
-| 128×128 | 7.3 KiB | 0.6 ms | below the 8 px floor | — | Thumbnails, no detection |
-| 320×256 | 37 KiB | 3.0 ms | 320: AP50 0.664 | ~80 | Below the size floor, avoid |
-| 640×512 | 139 KiB | 11 ms | 640: AP50 **0.872** | ~43 | **Thermal. The working stream.** |
-| 1280×1024 | 454 KiB | 37 ms | 640 tiles | ~20 | **RGB. The working stream.** |
-| 1920×1080 | 677 KiB | 55 ms | 640 tiles | ~14 | RGB if the link allows |
-| 2560×1440 | 1.0 MiB | 85 ms | 640 tiles | ~9 | Link starts to hurt |
-| 3840×2160 | 1.8 MiB | 149 ms | 640 tiles (32) | ~1.6 | Frame-accumulate |
+| Resolution | Bytes | Send @100 Mb/s | FPS ceiling | Verdict |
+| --- | --- | --- | --- | --- |
+| 640×512 thermal | 139 KiB | 11 ms | ~43 | **Send this.** AP50 0.872 at 640 input |
+| 1280×1024 RGB | 454 KiB | 37 ms | ~20 | **Send this.** Same 49 m ceiling as thermal |
+| Anything higher | 677 KiB and up | 55 ms and up | ~14 and down | No gain. Coverage has no sensor width in it, so a bigger sensor only reaches an altitude the drone cannot use |
+
+4K was cut for that reason: 1.8 MiB a frame and 40× the detector time to reach an altitude above
+the 49 m detection floor. Tiling the native frame is the only thing that made 4K worth sending, and
+tiling belongs on the station, which already has the headroom.
 
 FPS ceiling is 1000 ÷ (send + detect), since the pipeline cannot overlap them yet.
 
@@ -70,18 +70,27 @@ Coverage is set by field of view and altitude. Sensor width is not in the formul
 camera and a 4K camera with the same lens see identical ground. Resolution decides how high the
 drone can hover before a person falls under the 8 px detection floor, not how much it can see.
 
-| Altitude | Swath (72° RGB) | Person px @1280 | @4K | Hectares in 2 min @2 m/s |
+Swath is `2·altitude·tan(HFOV/2)` and does not depend on sensor width. Frame height depends on the
+sensor's aspect ratio, which is not decided yet; the table uses the 4:3 RGB and 5:4 thermal
+cameras assumed in [detection-data-analysis.md](../datasets/detection-data-analysis.md) §8.
+
+| Altitude | RGB 72°, one frame | Person px @1280 | @4K | Sweep in 2 min @2 m/s |
 | --- | --- | --- | --- | --- |
-| 20 m | 29 m | 20 | 59 | 0.70 |
-| 30 m | 44 m | 13 | 40 | 1.05 |
-| 40 m | 58 m | 10 | 30 | 1.39 |
-| 50 m | 73 m | 8 | 24 | 1.74 |
+| 20 m | 29 × 22 m | 20 | 59 | 0.0070 km² |
+| 30 m | 44 × 33 m | 13 | 40 | 0.0105 km² |
+| 40 m | 58 × 43 m | 10 | 30 | 0.0139 km² |
+| 49 m | 71 × 53 m | 8 | 24 | 0.0171 km² |
 
-A car park is 0.1 ha, a small building 0.2, a city block 2. So at 40 m a two-minute sweep covers
-about one collapsed building, with persons still at 10 px. 1280 reaches that; 4K buys nothing.
+These are small numbers, and that is the point. At 40 m a two-minute sweep covers 0.014 km²,
+which is a football pitch and a half, with persons still at 10 px. A single hover is 0.0025 km²
+and never grows. An urban cell sector is roughly 28 km², so one hover is about 11,000 times short of
+the area carrier data narrows the search to.
 
-Thermal has a 40° field of view against RGB's 72°, which halves the swath to 15 to 29 m between
-20 and 50 m. Both modalities still cover the same ground, thermal just slows the sweep.
+For scale in everyday terms, since the km² figures are small: a tennis court is 260 m², a car park
+1,000 m², a small building 2,000 m², a football pitch 7,100 m².
+
+Thermal at 40 m is 29 × 23 m, or 0.0007 km², because its 40° field of view is half the RGB one.
+Both modalities see the same ground; thermal just slows the sweep by roughly half.
 
 This is why 4K is not worth sending: it costs 4× the bytes and 40× the detector time to reach an
 altitude the drone was never going to use.
@@ -147,6 +156,43 @@ nmcli device wifi hotspot ifname wlan0 ssid "capstone-sar" password "<password>"
 Sharing WiFi over WiFi costs 30 to 40% throughput on some adapters, which is one of the reasons the
 design figure is halved.
 
+## Hardware
+
+Both endpoints run a Raspberry Pi. The Robotics team confirmed this for the robot, and using the
+same computer on both sides means one bill of materials, one provisioning process and shared
+spares.
+
+| Option | Band | Real 5 GHz | Margin over 74 Mbit/s | Verdict |
+| --- | --- | --- | --- | --- |
+| Pi Zero 2W onboard | 2.4 GHz only | — | — | Out, no 5 GHz |
+| Pi 4 / 5 onboard | 802.11ac 5 GHz, 1×1, PCB trace | 80–110 Mbit/s | 1.1–1.5× | **Too tight** |
+| Pi + USB RTL8812AU | ac 2×2, external SMA | ~140 Mbit/s | 1.9× | Works, needs a DKMS driver |
+| Pi + USB MT7921AUN | ax WiFi 6 | ~350 Mbit/s | 4.7× | Recommended |
+| Pi 5 + M.2 AX210 | ax WiFi 6E | ~650 Mbit/s | 8.8× | Best, native driver |
+
+**Recommendation: a Pi 5 with an MT7921AUN USB adapter and a 5 GHz antenna on the airframe.**
+Roughly $110–135 and about 80 g mounted. A Pi 4 is acceptable if weight is tight. A Jetson Orin Nano
+at 140 g is wasted here, since the architecture forbids running detection on the drone.
+
+The onboard radio is the problem, not the Pi. It is 1×1 with a PCB trace antenna and measures 80 to
+110 Mbit/s in the lab, while the two drone streams plus a robot feed want 74 Mbit/s. That is most of
+the capacity spent before any range loss, and throughput falls off a cliff once the link drops to a
+lower MCS. The robot needs the same adapter, and its antenna matters more than the drone's, since it
+works at ground level among walls.
+
+A companion computer also buys two things the flight controller cannot: the drone can JPEG-encode
+rather than send raw frames, and it can record to SD so a dropped link does not lose data.
+
+## What the drone covers
+
+The drone hovers over a **known collapse site** rather than searching one. A cell sector from
+carrier data is far larger than any single hover, so an operator narrows it to a building first.
+That is what makes fixed-point hover viable, and it is why coverage per frame never has to grow.
+
+At the 8 px detection floor for a standing person, the usable ceiling is 49 m, which matches
+thermal at 640×512 and RGB at 1280×1024. Higher than that and nobody is detected regardless of
+sensor. Lower than 20 m and one frame is 0.0006 km² of ground, which only suits a small site.
+
 ## What this does not settle
 
 Our thermal model scores AP50 0.872 on HIT-UAV and **0.010 on real WiSARD thermal footage**.
@@ -158,7 +204,44 @@ needs a return behaviour. Neither is implemented.
 
 All three gaps are open questions in [open-questions.md](../../open-questions.md), along with the
 hardware choice: every resolution, rate and range number above moves if the drone's camera and
-radio differ from what we assumed.
+radio differ from what we assumed. So does the case where the team is handed a whole cell sector
+instead of a building, since the drone would then have to search rather than hover.
+
+## Still unanswered
+
+These are the questions this analysis raised but could not settle. Each belongs in
+[open-questions.md](../../open-questions.md) once the team has agreed it matters.
+
+**About the mission**
+- What is the target site? A single building fixes the hover. A cell sector does not.
+- Who narrows the carrier sector to a building, and how long before the drone launches?
+- If the team is handed a sector rather than a building, does the robot search the rest, or does the
+  drone sweep? The second needs pose tracking, frame stitching and detection de-duplication, since
+  the same victim appears in every overlapping frame.
+
+**About the hardware**
+- Which drone and camera? Every number above moves with it.
+- What are the frame aspect ratio and field of view? The heights in the coverage table assume 4:3 RGB
+  and 5:4 thermal.
+- What is the drone's flight time, and does hovering at 20 to 40 m fit inside it?
+- Does the drone's autopilot release the WiFi interface for client use?
+
+**About the link**
+- How is the remaining 29 Mbit/s split between the robot stream and the operator UI?
+- Measured throughput and range through real rubble, not free space?
+- What happens on link loss? The station needs to keep working from its last detections and the
+  drone needs a return path. Neither is implemented.
+- Does the operator UI need video at all, or would downscaled keyframes at 1 FPS do?
+
+**About the detector**
+- Retrain thermal on HIT-UAV plus WiSARD, or ship a detector that only works on HIT-UAV? AP50 is
+  0.010 on real WiSARD thermal against 0.872 on HIT-UAV.
+- Should the RGB path wait for the domain gap to close, or ship as COCO zero-shot with a stated
+  caveat?
+
+**About scope**
+- Is audio still in scope, and what structured signal does it output?
+- Does the tumbling robot ever search, or only verify?
 
 ## Measuring it
 
