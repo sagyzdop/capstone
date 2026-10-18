@@ -32,8 +32,7 @@ Entry template:
 ## 2026-10-18 — Link and coverage
 
 ### Decided
-- **The station laptop is the access point.** Drone, robot and the operator's phone are clients on one network. Rationale: the station is already the orchestrator and the only compute node, so this avoids a second device to power or configure in rubble.
-- **No separate access point for the phone.** Rationale: macOS caps Internet Sharing near 10 devices and we plan three. Worth revisiting only if the phone ever needs its own channel or VLAN.
+- **The station laptop is the access point.** Drone and robot are clients on one network. Rationale: the station is already the orchestrator and the only compute node, so this avoids a second device to power or configure in rubble.
 - **5 GHz, 80 MHz, non-DFS, with 2.4 GHz as a rubble fallback.** Rationale: about 3× the throughput of 2.4 GHz and 3.5× the Fresnel range per metre of antenna height. Non-DFS because a mid-flight radar check would drop a safety link.
 - **Design against 100 Mbit/s per link, not the 200 to 600 Mbit/s real-world maximum.** Rationale: we are a client with an unknown radio rather than an access-point vendor, and halving the pessimistic figure leaves headroom for a degraded link.
 - **100 Mbit/s sustains to about 348 m.** Rationale: a measured 802.11ax throughput-against-RSSI curve through a free-space budget puts it at −76 dBm. The working range is 20 to 120 m, so rubble rather than distance is the limit.

@@ -80,7 +80,11 @@ figure is the one to design against.
 | Station → rescue team | Victim location and status | On detection | Negligible |
 
 The drone's video goes to a detector as JPEG frames. The robot's goes to a human, so H.264 carries it
-in 2.6 Mbit/s. That leaves 26 Mbit/s for the operator UI.
+in 2.6 Mbit/s.
+
+Total load is about 74 Mbit/s, leaving roughly 25 Mbit/s of headroom. The operator UI is rendered on
+the station's own screen and costs nothing on the network; the headroom covers reassociation overhead,
+the robot's thermal stream if it goes uncompressed, and margin for a degraded link.
 
 ## Hardware
 
@@ -102,8 +106,8 @@ JPEG-encode at 30 FPS while flying. The Pi also records to SD, so a dropped link
 
 ## Setup
 
-The station laptop is the access point. Drone, robot, phone and operator laptop are clients, four of
-macOS's roughly ten. 5 GHz, 80 MHz, non-DFS, since a mid-flight radar check would drop the link. 2.4 GHz
+The station laptop is the access point. Drone and robot are its clients, well inside macOS's roughly
+ten-device limit. 5 GHz, 80 MHz, non-DFS, since a mid-flight radar check would drop the link. 2.4 GHz
 is the rubble fallback.
 
 ```bash
@@ -145,8 +149,8 @@ Blocking, and all in [open-questions.md](../../open-questions.md):
 - No drone or camera chosen. Which Pi, which radio, which field of view.
 - Handed a cell sector instead of a building, the drone would have to search rather than hover.
 
-Non-blocking: how the remaining 26 Mbit/s splits between robot and operator UI, measured throughput
-through rubble, flight time at 20 to 40 m, whether audio is still in scope.
+Non-blocking: measured throughput through rubble, flight time at 20 to 40 m, whether the robot's
+thermal stream is compressed, whether audio is still in scope.
 
 ## Measuring
 

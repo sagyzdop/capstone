@@ -38,7 +38,7 @@ Answers are not repeated here. The changelog is the single place to find them.
 | The ground robot's drop point is known. | Needed for path planning. | Robot localisation becomes harder. | Agreed |
 | The vehicle drives to a **known collapse site** and the drone hovers over it. | Core of the pivot. The operator narrows the CDR cell sector down to a specific building before deployment; the drone then hovers over that building rather than searching it. | A hover covers 58 × 43 m at 40 m, 0.0025 km², and never grows. An urban cell sector is about 28 km², so one hover is roughly 11,000 times short. If the team is handed a sector rather than a building, the station has nothing to do. | Agreed |
 | WiFi connects the station to both the drone and the robot. | Diagram shows WiFi links. | Video and control links fail. | Open |
-| The station laptop is the WiFi access point; drone, robot and the operator's phone are clients on one network. | Avoids a second powered device at the site; the station is already the only compute node. | Sharing WiFi over WiFi costs 30 to 40% throughput, and a client limit may be reached. | Open |
+| The station laptop is the WiFi access point; drone and robot are clients on one network. | Avoids a second powered device at the site; the station is already the only compute node. | Sharing WiFi over WiFi costs 30 to 40% throughput, and a client limit may be reached. | Open |
 | Each link sustains at least 100 Mbit/s, halved from a pessimistic 200 Mbit/s real-world 5 GHz client rate. | Half the realistic maximum leaves headroom for a degraded link. | Every image size and frame rate in [research/communication/](research/communication/) scales with this. | Open |
 | Rubble attenuates the link by no more than one wall's worth on the flight path. | Post-earthquake rubble is the main non-free-space loss. | The link drops and the drone must return; no return behaviour is implemented. | Open |
 
@@ -53,4 +53,3 @@ Answers are not repeated here. The changelog is the single place to find them.
 | How do we use the WiFi, and what bandwidth do we design against? | [2026-10-18](CHANGELOG.md) |
 | What photo resolutions, frame rates and distances can the WiFi link support? | [2026-10-18](CHANGELOG.md) |
 | Which YOLO models are suitable? | [2026-10-18](CHANGELOG.md) |
-| Do we need a separate access point to connect the operator's phone to the laptop? | [2026-10-18](CHANGELOG.md) |

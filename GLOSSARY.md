@@ -105,9 +105,9 @@ How the analysis scripts compute these, from
 | --- | --- |
 | WiFi | 802.11 wireless. We use 5 GHz for both drone and robot links. |
 | Access point (AP) | The device broadcasting the network. Here, the station laptop. |
-| Station-hosted network | Drone, robot and phone as clients on one network run by the station. No separate router. |
+| Station-hosted network | Drone and robot as clients on one network run by the station. No separate router. |
 | SSID | Network name. Ours is `capstone-sar`. |
-| Client / station | A device that joins the network. Drone, robot and phone are clients. |
+| Client / station | A device that joins the network. Drone and robot are clients. |
 | Internet Sharing | The macOS feature that makes the station an access point. Needs a dummy upstream interface on `lo0` to start. |
 | AdHoc | The dummy network service created on the loopback so Internet Sharing has something to share. |
 | Non-DFS channel | A 5 GHz channel with no radar detection. Avoided DFS because a mid-flight radar check drops the link. |
