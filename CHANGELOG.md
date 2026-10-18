@@ -16,6 +16,7 @@ Entry template:
 ## [Unreleased]
 
 ### Added
+- HERIDAL profile in [station/heridal-profile.md](station/heridal-profile.md) (`src/detection/heridal_profile.py`), on the Roboflow 640×640 export. Same eight points as the other profiles, with an at-a-glance row in the audit.py metric definitions. Findings: 44 of 101 test images have a near-duplicate in train/valid, people are the smallest of all sets (median 126 px²), 70% are low-contrast in grey level, 35.5% of frames are empty, 11 scene types.
 - Per-dataset profiles in [station/dataset-profiles.md](station/dataset-profiles.md): size, distinct backgrounds (`src/detection/backgrounds.py`), persons per image, pixels per person, contrast, sharpness and crowding, each as mean + percentiles.
 - Dataset suitability audit in [station/dataset-suitability.md](station/dataset-suitability.md) (`src/detection/audit.py`, `src/detection/eval_sizes.py`). Findings: C2A val/test leak (98% of scenes shared with train), HIT-UAV flag 1 = night, thermal model does not transfer to WiSARD IR (AP50 0.87 → 0.01), tiling is required for 4K RGB, RGB↔IR alignment supports late fusion only.
 
