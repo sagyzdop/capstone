@@ -20,6 +20,7 @@ Raw data goes in `data/raw/<dataset>/`, converted data in `data/yolo/` (both git
 | Convert to single-class `person` YOLO | `python src/detection/prepare.py hit-uav --person-ids 0 --split train=IMG_DIR:COCO.json ...` |
 | Analyse person sizes | `python src/detection/analyze.py data/yolo/hit-uav/images data/yolo/hit-uav/labels --out station/assets/hit-uav-analysis` |
 | Dataset audit (all sets) | `python src/detection/audit.py --out station/assets/audit` |
+| HERIDAL profile (Roboflow export in `data/raw/heridal-roboflow/`, also needs `scikit-learn scipy`) | `python src/detection/heridal_profile.py && python src/detection/heridal_cluster_sheets.py && python src/detection/heridal_scenes.py` |
 | Recall per size vs imgsz / tiling (inference only) | `python src/detection/eval_sizes.py MODEL.pt wisard-vis val --imgsz 640 1280 --tile 640 --out OUT.json` |
 | Train | `yolo detect train model=yolo11n.pt data=data/yolo/hit-uav.yaml epochs=50 patience=15 imgsz=640 batch=16 device=mps cache=ram` |
 | Evaluate on test | `yolo detect val model=runs/.../weights/best.pt data=data/yolo/hit-uav.yaml split=test device=mps` |
