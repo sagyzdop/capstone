@@ -13,7 +13,7 @@ No model was trained. All model numbers come from inference only, using existing
 | Dataset | Use it for | Do not use it for | Main problems |
 | --- | --- | --- | --- |
 | **HIT-UAV** (thermal) | Training the thermal detector | Judging real-world performance alone | No disaster scenes; 60–130 m altitude is higher than we will hover; daytime persons barely stand out; 31% of val/test images are near-duplicates of train images |
-| **C2A** (RGB) | RGB pre-training and pose variety (19% lying) | Any reported metric: its splits leak | 98% of val/test background scenes also appear in train; persons are pasted at a fixed 4–24 px whatever the image scale; 32% are under 8 px; no images without persons |
+| **C2A** (RGB) | RGB pre-training and pose variety (19% lying) | Any reported metric: its splits leak | 98% of val/test background scenes also appear in train; persons are pasted at a fixed 4–24 px whatever the image scale; 35% are under 8 px; no images without persons |
 | **WiSARD sample** (RGB + IR) | A real-world sanity check; measuring RGB–IR geometry | Training or benchmarking | One flight, the same 4 actors, 264 frames |
 
 Key numbers:
@@ -48,8 +48,8 @@ Definitions:
 | Resolution | 640×512 (all) | 230–4000 px, median long side 428 | 640×512 | 3840×2160 |
 | Images with no person | **41.6%** | **0%** | 1.1% | 1.1% |
 | Persons per image, median (p95, max) | 2 (16, 33) | 34 (49, 240) | 4 (4, 4) | 4 (4, 4) |
-| Person px p5 / p50 / p95 | 10.3 / 15.4 / 24.7 | 3.9 / 12.4 / 23.9 | 13.4 / 17.4 / 25.4 | 49.6 / 67.5 / 105.5 |
-| Persons < 8 px (native) | 0.4% | **32.4%** | 0% | 0% |
+| Person px p5 / p50 / p95 | 9.9 / 14.9 / 24.4 | 3.5 / 12.0 / 23.2 | 13.3 / 17.2 / 24.9 | 49.3 / 66.7 / 105.0 |
+| Persons < 8 px (native) | 0.5% | **34.6%** | 0% | 0% |
 | Low-contrast persons | 25.7% | 68.2%* | 2.9% | 88.6%* |
 | Overlapping another person | 19.4% | 5.1% | 23.0% | 23.1% |
 | Val/test near-duplicates of train | **31%** | **72%** | n/a | n/a |
@@ -65,7 +65,7 @@ Definitions:
 
 **HIT-UAV.**
 - Persons are 10–25 px warm blobs with no visible limbs.
-- 59% of boxes are elongated (aspect ratio > 1.5 or < 0.67), consistent with standing or walking people seen at an angle.
+- 62% of boxes are elongated (aspect ratio > 1.5 or < 0.67), consistent with standing or walking people seen at an angle.
 - **Day versus night is the biggest quality factor.** Median person contrast is 0.23 std by day and 1.06 std at night. In daytime the ground warms up and people almost vanish into the background.
 - The dataset ships an undocumented filename flag. The order in `tools/info/scenario.txt` (day, night) together with this contrast gap confirms that **flag 0 = day and flag 1 = night**. Night makes up 68% of images and 78% of persons.
 
@@ -73,7 +73,7 @@ Definitions:
 
 **C2A.**
 - People are cut out and pasted onto real disaster photos (AIDER).
-- At p5 (3.9 px) a person is a few coloured pixels with no human shape: these labels carry almost no signal.
+- At p5 (3.5 px) a person is a few coloured pixels with no human shape: these labels carry almost no signal.
 - Persons are pasted at absolute sizes of about 4–24 px **regardless of image resolution**. Median size is 11.7 px on 240 px images and 13.4 px on 4K images, so relative size varies 5×, from 4.4% to 0.8% of the frame. A person's scale therefore doesn't match the scene's ground resolution, which is physically wrong and lets a model learn "small blob = person" rather than scale-consistent cues.
 - The size histogram is bimodal (peaks around 6 px and 22–24 px) with a hard cutoff at 24 px. This is a generator artifact.
 - Grey-level contrast is slightly negative (median −0.19): pasted people tend to be darker than their surroundings and are separated mainly by colour.
@@ -142,7 +142,7 @@ Spatial bias:
 | Real disaster imagery | ✗ | ✗ (real backgrounds, fake people) | ✗ (real search and rescue, no disaster) |
 | Same disaster types on all splits | n/a | ✓ about 25% each: collapsed building, fire, flood, traffic incident | n/a |
 
-**Gap:** no downloaded dataset has real people in real rubble, at any modality. C2A's pose sizes are flat (12–13.4 px median for every pose) because size was set by the generator, not by pose.
+**Gap:** no downloaded dataset has real people in real rubble, at any modality. C2A's pose sizes are flat (11.5–13.0 px median for every pose) because size was set by the generator, not by pose.
 
 ## 7. Downscaling and input resolution
 
@@ -267,7 +267,7 @@ Fusion options:
 | --- | --- | --- |
 | **YOLO11n/s, thermal at native 640** | 12 ms per image on M4 at AP50 0.87 in-domain; fits the station laptop | Train at the size you will run at |
 | **YOLO11s/m RGB with 640 tiles over the full frame** | Tiling was the only way to keep 4K persons (AP50 ×10) | About 40 tiles per 4K frame: batch them, or tile only the IR-proposed regions |
-| **P2 (stride-4) head variant** (e.g. `yolov8-p2.yaml`, or YOLO11 with an added P2 head) | 32% of C2A and the 8–12 px band are where recall drops | More compute; validate on real data |
+| **P2 (stride-4) head variant** (e.g. `yolov8-p2.yaml`, or YOLO11 with an added P2 head) | 35% of C2A and the 8–12 px band are where recall drops | More compute; validate on real data |
 | RT-DETR / DETR family | Strong on medium objects | Usually weaker on persons under 16 px and slower; low priority |
 | Late-fusion ensemble (weighted box fusion) | Uses both cameras without paired training data | Needs camera calibration |
 

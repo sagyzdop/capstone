@@ -35,30 +35,30 @@
   ],
   "grayscale_pct": 100.0,
   "size_px_pcts": [
-   10.25,
-   12.85,
-   15.43,
-   18.97,
-   24.66
+   9.95,
+   12.37,
+   14.87,
+   18.57,
+   24.37
   ],
   "size_bins_pct": {
-   "0-8": 0.4,
-   "8-12": 15.5,
-   "12-16": 39.3,
-   "16-24": 38.7,
-   "24-32": 5.8,
-   "32-64": 0.3,
+   "0-8": 0.5,
+   "8-12": 19.9,
+   "12-16": 38.2,
+   "16-24": 35.8,
+   "24-32": 5.2,
+   "32-64": 0.2,
    "64-1e+09": 0.0
   },
-  "rel_area_pct_median": 0.0726,
+  "rel_area_pct_median": 0.0674,
   "aspect_wh_pcts": [
    0.38,
-   0.5,
-   0.61,
+   0.48,
+   0.6,
    0.8,
-   1.14
+   1.15
   ],
-  "elongated_pct": 59.2,
+  "elongated_pct": 61.6,
   "edge_truncated_pct": 4.3,
   "overlapping_pct": 19.4,
   "nn_gap_lt2_pct": 53.3,
@@ -115,14 +115,14 @@
    "day": {
     "images": 917,
     "persons": 2739,
-    "median_px": 16.3,
+    "median_px": 15.9,
     "median_contrast": 0.23,
     "brightness_median": 124.8
    },
    "night": {
     "images": 1981,
     "persons": 9573,
-    "median_px": 15.0,
+    "median_px": 14.5,
     "median_contrast": 1.06,
     "brightness_median": 126.2
    }
@@ -131,56 +131,56 @@
    "60": {
     "images": 863,
     "persons": 6268,
-    "median_px": 16.4,
+    "median_px": 16.0,
     "median_contrast": 1.13,
     "brightness_median": 125.4
    },
    "70": {
     "images": 267,
     "persons": 994,
-    "median_px": 18.4,
+    "median_px": 18.0,
     "median_contrast": 0.33,
     "brightness_median": 132.8
    },
    "80": {
     "images": 256,
     "persons": 1316,
-    "median_px": 16.6,
+    "median_px": 16.2,
     "median_contrast": 0.44,
     "brightness_median": 127.6
    },
    "90": {
     "images": 145,
     "persons": 429,
-    "median_px": 15.2,
+    "median_px": 14.7,
     "median_contrast": 0.61,
     "brightness_median": 124.0
    },
    "100": {
     "images": 291,
     "persons": 811,
-    "median_px": 14.1,
+    "median_px": 13.7,
     "median_contrast": 0.6,
     "brightness_median": 121.3
    },
    "110": {
     "images": 247,
     "persons": 833,
-    "median_px": 14.0,
+    "median_px": 13.5,
     "median_contrast": 0.74,
     "brightness_median": 122.7
    },
    "120": {
     "images": 336,
     "persons": 663,
-    "median_px": 11.3,
+    "median_px": 11.0,
     "median_contrast": 1.03,
     "brightness_median": 121.4
    },
    "130": {
     "images": 493,
     "persons": 998,
-    "median_px": 12.0,
+    "median_px": 11.7,
     "median_contrast": 1.08,
     "brightness_median": 131.6
    }
@@ -189,49 +189,49 @@
    "30": {
     "images": 477,
     "persons": 3300,
-    "median_px": 13.0,
+    "median_px": 12.6,
     "median_contrast": 0.97,
     "brightness_median": 119.2
    },
    "40": {
     "images": 339,
     "persons": 988,
-    "median_px": 13.9,
+    "median_px": 13.4,
     "median_contrast": 0.56,
     "brightness_median": 125.0
    },
    "50": {
     "images": 486,
     "persons": 1738,
-    "median_px": 17.3,
+    "median_px": 16.7,
     "median_contrast": 0.76,
     "brightness_median": 127.6
    },
    "60": {
     "images": 471,
     "persons": 1648,
-    "median_px": 17.6,
+    "median_px": 17.2,
     "median_contrast": 0.72,
     "brightness_median": 125.9
    },
    "70": {
     "images": 421,
     "persons": 1210,
-    "median_px": 17.5,
+    "median_px": 17.1,
     "median_contrast": 0.71,
     "brightness_median": 129.9
    },
    "80": {
     "images": 390,
     "persons": 2647,
-    "median_px": 17.5,
+    "median_px": 17.3,
     "median_contrast": 1.61,
     "brightness_median": 125.5
    },
    "90": {
     "images": 314,
     "persons": 781,
-    "median_px": 16.4,
+    "median_px": 16.0,
     "median_contrast": 0.58,
     "brightness_median": 129.9
    }
@@ -240,7 +240,7 @@
    "sunny": {
     "images": 2898,
     "persons": 12312,
-    "median_px": 15.4,
+    "median_px": 14.9,
     "median_contrast": 0.9,
     "brightness_median": 126.1
    }
@@ -356,30 +356,30 @@
   ],
   "grayscale_pct": 0.0,
   "size_px_pcts": [
-   3.87,
-   6.32,
-   12.41,
-   21.49,
-   23.87
+   3.46,
+   5.74,
+   12.0,
+   20.98,
+   23.24
   ],
   "size_bins_pct": {
-   "0-8": 32.4,
+   "0-8": 34.6,
    "8-12": 15.6,
-   "12-16": 13.5,
-   "16-24": 35.0,
-   "24-32": 2.9,
+   "12-16": 12.8,
+   "16-24": 35.8,
+   "24-32": 0.6,
    "32-64": 0.4,
    "64-1e+09": 0.1
   },
-  "rel_area_pct_median": 0.0877,
+  "rel_area_pct_median": 0.082,
   "aspect_wh_pcts": [
-   0.36,
-   0.55,
-   0.83,
-   1.34,
-   2.27
+   0.35,
+   0.5,
+   0.82,
+   1.35,
+   2.33
   ],
-  "elongated_pct": 53.5,
+  "elongated_pct": 57.4,
   "edge_truncated_pct": 3.1,
   "overlapping_pct": 5.1,
   "nn_gap_lt2_pct": 38.1,
@@ -458,11 +458,11 @@
    "upright": 24.2
   },
   "pose_median_px": {
-   "bent": 12.2,
-   "kneeling": 12.0,
-   "lying": 12.0,
-   "sitting": 12.0,
-   "upright": 13.4
+   "bent": 11.7,
+   "kneeling": 11.5,
+   "lying": 11.6,
+   "sitting": 11.6,
+   "upright": 13.0
   },
   "scenes_per_split": {
    "test": 1399,
@@ -508,30 +508,30 @@
   ],
   "grayscale_pct": 100.0,
   "size_px_pcts": [
-   13.42,
-   15.2,
-   17.44,
-   20.12,
-   25.35
+   13.25,
+   14.72,
+   17.22,
+   19.86,
+   24.95
   ],
   "size_bins_pct": {
    "0-8": 0.0,
-   "8-12": 0.8,
-   "12-16": 32.9,
-   "16-24": 59.8,
-   "24-32": 5.2,
-   "32-64": 1.3,
+   "8-12": 1.7,
+   "12-16": 38.4,
+   "16-24": 54.0,
+   "24-32": 4.8,
+   "32-64": 1.2,
    "64-1e+09": 0.0
   },
-  "rel_area_pct_median": 0.0928,
+  "rel_area_pct_median": 0.0905,
   "aspect_wh_pcts": [
    0.35,
-   0.43,
+   0.42,
    0.57,
    0.83,
    1.15
   ],
-  "elongated_pct": 58.3,
+  "elongated_pct": 59.0,
   "edge_truncated_pct": 0.4,
   "overlapping_pct": 23.0,
   "nn_gap_lt2_pct": 48.6,
@@ -616,11 +616,11 @@
   ],
   "grayscale_pct": 0.0,
   "size_px_pcts": [
-   49.57,
-   57.27,
-   67.48,
-   80.41,
-   105.5
+   49.29,
+   56.92,
+   66.68,
+   79.6,
+   105.0
   ],
   "size_bins_pct": {
    "0-8": 0.0,
@@ -628,18 +628,18 @@
    "12-16": 0.0,
    "16-24": 0.0,
    "24-32": 0.0,
-   "32-64": 43.2,
-   "64-1e+09": 56.8
+   "32-64": 43.7,
+   "64-1e+09": 56.3
   },
-  "rel_area_pct_median": 0.0549,
+  "rel_area_pct_median": 0.0536,
   "aspect_wh_pcts": [
-   0.36,
+   0.35,
    0.45,
    0.63,
    0.9,
    1.11
   ],
-  "elongated_pct": 54.5,
+  "elongated_pct": 54.8,
   "edge_truncated_pct": 0.1,
   "overlapping_pct": 23.1,
   "nn_gap_lt2_pct": 49.9,
