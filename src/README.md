@@ -1,12 +1,12 @@
 # Source Code
 
-> **Status:** Draft · **Updated:** 2026-10-15
+> **Status:** Draft · **Updated:** 2026-10-18
 
 ## Purpose
 
-All project code. Nothing here yet.
+All project code. Python, split by station component.
 
-## Planned modules
+## Modules
 
 | Module | Component | Status |
 | --- | --- | --- |

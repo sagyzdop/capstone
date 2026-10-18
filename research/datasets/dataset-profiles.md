@@ -3,8 +3,8 @@
 Profiles of the four downloaded datasets (two modalities of WiSARD counted separately), in the same eight points each:
 summary, size, distinct backgrounds, people per image, pixels per person, contrast, sharpness, crowding.
 Every number is mean plus the 5th / 25th / 50th / 75th / 95th percentiles (written `p5 / p25 / p50 / p75 / p95`)
-over all images or all annotated persons. Numbers come from `station/assets/audit/audit.json` and
-`station/assets/audit/backgrounds.json`; see [Reproduce](#reproduce).
+over all images or all annotated persons. Numbers come from `research/datasets/assets/audit/audit.json` and
+`research/datasets/assets/audit/backgrounds.json`; see [Reproduce](#reproduce).
 
 ## At a glance
 
@@ -476,8 +476,8 @@ labels agree.
 ## Reproduce
 
 ```bash
-# per-person / per-image metrics (sizes, contrast, sharpness, crowding) -> station/assets/audit/audit.json
-python src/detection/audit.py --out station/assets/audit
+# per-person / per-image metrics (sizes, contrast, sharpness, crowding) -> research/datasets/assets/audit/audit.json
+python src/detection/audit.py --out research/datasets/assets/audit
 # distinct backgrounds (ResNet-50 embeddings + clustering) -> backgrounds.json + backgrounds_<name>.png
-python src/detection/backgrounds.py --out station/assets/audit
+python src/detection/backgrounds.py --out research/datasets/assets/audit
 ```

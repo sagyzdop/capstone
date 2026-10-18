@@ -1,6 +1,6 @@
 # Station
 
-> **Status:** Draft · **Updated:** 2026-10-04
+> **Status:** Draft · **Updated:** 2026-10-18
 
 ## Purpose
 
@@ -24,9 +24,12 @@ Laptop compute budget, latency, and WiFi bandwidth: TBD.
 
 ## Contents
 
+Code lives in [src/detection/](../src/detection/); the dataset evidence behind it is in
+[research/datasets/](../research/datasets/).
+
 | File | Description |
 | --- | --- |
-| [detection-data-analysis.md](detection-data-analysis.md) | Person sizes vs model input size per dataset |
-| [dataset-profiles.md](dataset-profiles.md) | Per-dataset profile: size, backgrounds, persons per image, pixels per person, contrast, sharpness, crowding |
-| [dataset-suitability.md](dataset-suitability.md) | Full dataset audit: quality, density, coverage, leakage, downscaling, RGB + IR fusion, model options |
+| [detection-data-analysis.md](../research/datasets/detection-data-analysis.md) | Person sizes vs model input size per dataset |
+| [dataset-profiles.md](../research/datasets/dataset-profiles.md) | Per-dataset profile: size, backgrounds, persons per image, pixels per person, contrast, sharpness, crowding |
+| [dataset-suitability.md](../research/datasets/dataset-suitability.md) | Full dataset audit: quality, density, coverage, leakage, downscaling, RGB + IR fusion, model options |
 | [heridal-profile.md](heridal-profile.md) | HERIDAL (Roboflow 640 export) profile in the same eight points, plus scene types and split leakage |

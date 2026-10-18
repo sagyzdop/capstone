@@ -288,10 +288,10 @@ Training implications from the data (for later):
 ## Reproduce
 
 ```bash
-.venv/bin/python src/detection/audit.py --out station/assets/audit
+.venv/bin/python src/detection/audit.py --out research/datasets/assets/audit
 r() { nice -n 10 .venv/bin/python src/detection/eval_sizes.py --threads 3 "$@"; }
-r runs/runs/hituav-n-640/weights/best.pt hit-uav test --imgsz 320 480 640 960 1280 --out station/assets/audit/eval/hituav-model_hituav-test.json
-r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 960 1280 --out station/assets/audit/eval/hituav-model_wisard-ir.json
-r models/yolo11n.pt wisard-vis val --imgsz 640 1280 1920 --tile 640 --out station/assets/audit/eval/coco-model_wisard-vis.json
-r models/yolo11n.pt c2a test --imgsz 640 1280 --out station/assets/audit/eval/coco-model_c2a-test.json
+r runs/runs/hituav-n-640/weights/best.pt hit-uav test --imgsz 320 480 640 960 1280 --out research/datasets/assets/audit/eval/hituav-model_hituav-test.json
+r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 960 1280 --out research/datasets/assets/audit/eval/hituav-model_wisard-ir.json
+r models/yolo11n.pt wisard-vis val --imgsz 640 1280 1920 --tile 640 --out research/datasets/assets/audit/eval/coco-model_wisard-vis.json
+r models/yolo11n.pt c2a test --imgsz 640 1280 --out research/datasets/assets/audit/eval/coco-model_c2a-test.json
 ```

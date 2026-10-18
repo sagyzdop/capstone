@@ -6,7 +6,7 @@ metadata coverage (HIT-UAV altitude/angle/day-night, C2A disaster type/pose) and
 near-duplicate leakage between splits. Also checks WiSARD RGB/IR frame pairing.
 
 Usage:
-    python src/detection/audit.py --out station/assets/audit
+    python src/detection/audit.py --out research/datasets/assets/audit
 Writes OUT/audit.json and comparison plots.
 """
 

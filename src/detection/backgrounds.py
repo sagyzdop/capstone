@@ -6,7 +6,7 @@ day/night, altitude and angle; WiSARD: one frame each), group embeddings are ave
 greedy leader clustering (cosine to a cluster's first member) merges groups that look like the same place.
 
 Usage:
-    python src/detection/backgrounds.py --out station/assets/audit
+    python src/detection/backgrounds.py --out research/datasets/assets/audit
 Writes OUT/backgrounds.json and OUT/backgrounds_<name>.png (one tile per cluster, to eyeball).
 """
 

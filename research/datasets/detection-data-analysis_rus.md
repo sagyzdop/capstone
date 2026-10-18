@@ -505,16 +505,16 @@ GSD (ground sampling distance, расстояние между центрами 
 
 ```bash
 # Size vs imgsz per dataset
-.venv/bin/python src/detection/analyze.py data/yolo/hit-uav/images data/yolo/hit-uav/labels --out station/assets/hit-uav-analysis
-# Full audit + all charts in station/assets/audit/ (charts in §7 need the eval JSONs below)
-.venv/bin/python src/detection/audit.py --out station/assets/audit
+.venv/bin/python src/detection/analyze.py data/yolo/hit-uav/images data/yolo/hit-uav/labels --out research/datasets/assets/hit-uav-analysis
+# Full audit + all charts in research/datasets/assets/audit/ (charts in §7 need the eval JSONs below)
+.venv/bin/python src/detection/audit.py --out research/datasets/assets/audit
 # Inference-only sweeps (low priority, 3 threads)
 r() { nice -n 10 .venv/bin/python src/detection/eval_sizes.py --threads 3 "$@"; }
-r runs/runs/hituav-n-640/weights/best.pt hit-uav test --imgsz 320 480 640 960 1280 --out station/assets/audit/eval/hituav-model_hituav-test.json
-r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 960 1280 --out station/assets/audit/eval/hituav-model_wisard-ir.json
-r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 1280 --iou 0.25 --out station/assets/audit/eval/hituav-model_wisard-ir_iou25.json
-r models/yolo11n.pt hit-uav test --imgsz 640 960 --out station/assets/audit/eval/coco-model_hituav-test.json
-r models/yolo11n.pt wisard-ir val --imgsz 640 960 --out station/assets/audit/eval/coco-model_wisard-ir.json
-r models/yolo11n.pt wisard-vis val --imgsz 640 1280 1920 --tile 640 --out station/assets/audit/eval/coco-model_wisard-vis.json
-r models/yolo11n.pt c2a test --imgsz 640 1280 --out station/assets/audit/eval/coco-model_c2a-test.json
+r runs/runs/hituav-n-640/weights/best.pt hit-uav test --imgsz 320 480 640 960 1280 --out research/datasets/assets/audit/eval/hituav-model_hituav-test.json
+r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 960 1280 --out research/datasets/assets/audit/eval/hituav-model_wisard-ir.json
+r runs/runs/hituav-n-640/weights/best.pt wisard-ir val --imgsz 640 1280 --iou 0.25 --out research/datasets/assets/audit/eval/hituav-model_wisard-ir_iou25.json
+r models/yolo11n.pt hit-uav test --imgsz 640 960 --out research/datasets/assets/audit/eval/coco-model_hituav-test.json
+r models/yolo11n.pt wisard-ir val --imgsz 640 960 --out research/datasets/assets/audit/eval/coco-model_wisard-ir.json
+r models/yolo11n.pt wisard-vis val --imgsz 640 1280 1920 --tile 640 --out research/datasets/assets/audit/eval/coco-model_wisard-vis.json
+r models/yolo11n.pt c2a test --imgsz 640 1280 --out research/datasets/assets/audit/eval/coco-model_c2a-test.json
 ```

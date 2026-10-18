@@ -2,7 +2,7 @@
 
 ![status](https://img.shields.io/badge/status-in%20development-yellow)
 
-> **Status:** Draft · **Updated:** 2026-10-04
+> **Status:** Draft · **Updated:** 2026-10-18
 
 CSCI 408 senior project (Group 19). A vehicle carrying a laptop **station**, a **drone** and a **ground robot** drives to a spot where victims are likely to be after an earthquake. The drone hovers and streams video to the station, which detects and tags victims, plans a path, and sends the robot to verify the victim's status and talk to them.
 
@@ -27,11 +27,11 @@ flowchart LR
 | [station/](station/)                   | Station: detection, path planning, orchestration          |
 | [drone/](drone/)                       | Drone: hovering sensing platform                          |
 | [ground-robot/](ground-robot/)         | Ground robot and Robotics team collaboration              |
-| [literature/](literature/)             | Reading list, BibTeX, datasets, paper notes               |
+| [src/](src/)                           | Source code                                               |
+| [research/](research/)                 | Literature (reading list, BibTeX, notes) and datasets    |
 | [meeting-notes/](meeting-notes/)       | All meetings (supervisors, Robotics team, internal)       |
 | [templates/](templates/)               | Templates for recurring files                             |
 | [paper/](paper/)                       | Final report (LaTeX)                                      |
-| [src/](src/)                           | Source code                                               |
 | [open-questions.md](open-questions.md) | Open and resolved questions                               |
 | [CHANGELOG.md](CHANGELOG.md)           | Decisions and changes, newest first                       |
 
@@ -40,7 +40,7 @@ flowchart LR
 - [x] Initial architecure decided – stationary drone, tumblweed robot deployed at site, station as orchestrator
 - [ ] Concept of operations agreed by the team
 - [ ] Station–robot interface agreed with the Robotics team
-- [x] Datasets selected – HIT-UAV (thermal), C2A (RGB); see [literature/datasets.md](literature/datasets.md)
+- [x] Datasets selected – HIT-UAV (thermal), C2A (RGB); see [research/datasets/datasets.md](research/datasets/datasets.md)
 - [ ] Detection baseline running
 - [ ] End-to-end demo (simulated or recorded data)
 - [ ] Final report
@@ -59,11 +59,11 @@ flowchart LR
 
 ### Supervisors
 
-| Name         | Email                   | Role            |
-| ------------ | ----------------------- | --------------- |
-| Adnan Yazici | adnan.yazici@nu.edu.kz  | Main Supervisor |
-| Enver Ever   | enverevermetu@gmail.com | Supervisor      |
-| M            | -                       | Supervisor      |
+| Name                | Email                   | Role            |
+| ------------------- | ----------------------- | --------------- |
+| Adnan Yazici        | adnan.yazici@nu.edu.kz  | Main Supervisor |
+| Enver Ever          | enverevermetu@gmail.com | Supervisor      |
+| Muhammad Toaha Khan | khan@metu.edu.tr        | Supervisor      |
 
 
 ### Robotics team
@@ -85,7 +85,7 @@ flowchart LR
 - Record every decision or change in [CHANGELOG.md](CHANGELOG.md), including its rationale.
 - Add unresolved questions to the **Open** section of [open-questions.md](open-questions.md). Once answered, move them to **Resolved** and log the answer in the changelog.
 - Recurring files (meeting notes, literature notes) start from [templates/](templates/).
-- Cite only keys that exist in [literature/references.bib](literature/references.bib).
+- Cite only keys that exist in [research/literature/references.bib](research/literature/references.bib).
 - Do not copy the Robotics team's internals. Link to their docs and record dated facts in [ground-robot/](ground-robot/).
 
 </details>

@@ -1,14 +1,19 @@
-# Literature
+# Research
 
-> **Status:** Draft · **Updated:** 2026-10-04
+> **Status:** Draft · **Updated:** 2026-10-18
 
 ## How this folder works
 
-- Add every source to [references.bib](references.bib) (single source of truth for citations).
-- Write one note per paper in [notes/](notes/), named by citekey, using [../templates/literature-note.md](../templates/literature-note.md).
-- Candidate datasets go in [datasets.md](datasets.md).
+| Folder | Contents |
+| --- | --- |
+| [literature/](literature/) | `references.bib` (single source of truth for citations), per-paper notes in `notes/`, the literature review CSV |
+| [datasets/](datasets/) | Candidate list in [datasets.md](datasets/datasets.md), plus the analysis, charts and PDFs behind it |
 
-## Reading list
+- Add every source to [literature/references.bib](literature/references.bib).
+- Write one note per paper in [literature/notes/](literature/notes/), named by citekey, using [../templates/literature-note.md](../templates/literature-note.md).
+- Candidate datasets go in [datasets/datasets.md](datasets/datasets.md).
+
+## Literature
 
 | Citekey | Title | Topic | Status |
 | --- | --- | --- | --- |
