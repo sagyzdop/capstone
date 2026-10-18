@@ -1,0 +1,198 @@
+{
+  "Karst mosaic (grass + conifer/shrub clumps)": {
+    "n_images": 333,
+    "by_split": {
+      "train": 289,
+      "valid": 29,
+      "test": 15
+    },
+    "locations": {
+      "VRD": 155,
+      "RAK": 76,
+      "JAS": 59,
+      "MED": 32,
+      "BLI": 6,
+      "ZRI": 3,
+      "GOR": 2
+    },
+    "people_mean": 0.7807807807807807,
+    "empty_frac": 0.5405405405405406,
+    "rms_contrast_median": 0.20762152547109775,
+    "lap_var_median": 33129.21747840033
+  },
+  "Closed forest canopy": {
+    "n_images": 269,
+    "by_split": {
+      "train": 197,
+      "valid": 42,
+      "test": 30
+    },
+    "locations": {
+      "BRK": 142,
+      "BRA": 71,
+      "TRS": 49,
+      "ZRI": 4,
+      "MED": 1,
+      "BLA": 1,
+      "MOB": 1
+    },
+    "people_mean": 1.6988847583643123,
+    "empty_frac": 0.20446096654275092,
+    "rms_contrast_median": 0.1548320985360988,
+    "lap_var_median": 9112.79054499147
+  },
+  "Mediterranean shrubland / maquis": {
+    "n_images": 268,
+    "by_split": {
+      "train": 221,
+      "valid": 47
+    },
+    "locations": {
+      "MED": 113,
+      "VRD": 108,
+      "GOR": 40,
+      "BRK": 4,
+      "RAK": 3
+    },
+    "people_mean": 1.3470149253731343,
+    "empty_frac": 0.332089552238806,
+    "rms_contrast_median": 0.1518417323736111,
+    "lap_var_median": 23494.53264667772
+  },
+  "Dry karst grassland": {
+    "n_images": 219,
+    "by_split": {
+      "train": 173,
+      "valid": 40,
+      "test": 6
+    },
+    "locations": {
+      "JAS": 127,
+      "VRD": 45,
+      "GOR": 33,
+      "SB": 10,
+      "BLI": 2,
+      "CAB": 2
+    },
+    "people_mean": 0.821917808219178,
+    "empty_frac": 0.4885844748858447,
+    "rms_contrast_median": 0.15403745807695077,
+    "lap_var_median": 26089.224749822617
+  },
+  "Urban park": {
+    "n_images": 129,
+    "by_split": {
+      "train": 122,
+      "valid": 4,
+      "test": 3
+    },
+    "locations": {
+      "ZRI": 119,
+      "CAP": 10
+    },
+    "people_mean": 9.75968992248062,
+    "empty_frac": 0.12403100775193798,
+    "rms_contrast_median": 0.16551708141916513,
+    "lap_var_median": 5755.097544291592
+  },
+  "Leafless / grey winter scrub & hazy meadow": {
+    "n_images": 111,
+    "by_split": {
+      "train": 74,
+      "valid": 20,
+      "test": 17
+    },
+    "locations": {
+      "GOR": 69,
+      "SB": 11,
+      "GRO": 10,
+      "BRK": 8,
+      "BLA": 7,
+      "MOB": 4,
+      "VRD": 2
+    },
+    "people_mean": 1.8738738738738738,
+    "empty_frac": 0.14414414414414414,
+    "rms_contrast_median": 0.10744723446701487,
+    "lap_var_median": 15259.83451207712
+  },
+  "Dark sparse woodland (low light)": {
+    "n_images": 69,
+    "by_split": {
+      "train": 43,
+      "valid": 14,
+      "test": 12
+    },
+    "locations": {
+      "BRS": 66,
+      "BRA": 3
+    },
+    "people_mean": 1.5797101449275361,
+    "empty_frac": 0.2608695652173913,
+    "rms_contrast_median": 0.09520119413194612,
+    "lap_var_median": 6538.436144737601
+  },
+  "Snow-covered terrain": {
+    "n_images": 68,
+    "by_split": {
+      "train": 55,
+      "valid": 13
+    },
+    "locations": {
+      "GOR": 67,
+      "BRK": 1
+    },
+    "people_mean": 1.4411764705882353,
+    "empty_frac": 0.47058823529411764,
+    "rms_contrast_median": 0.166046816978964,
+    "lap_var_median": 10732.303992936395
+  },
+  "Riverside meadow & woodland edge": {
+    "n_images": 58,
+    "by_split": {
+      "train": 43,
+      "valid": 8,
+      "test": 7
+    },
+    "locations": {
+      "CAP": 54,
+      "MED": 2,
+      "RAK": 1,
+      "BLI": 1
+    },
+    "people_mean": 1.0,
+    "empty_frac": 0.5862068965517241,
+    "rms_contrast_median": 0.14426283446439755,
+    "lap_var_median": 10906.337033610904
+  },
+  "Cliffs / ravines with hard shadows": {
+    "n_images": 36,
+    "by_split": {
+      "train": 30,
+      "test": 6
+    },
+    "locations": {
+      "VRD": 30,
+      "CAB": 6
+    },
+    "people_mean": 1.25,
+    "empty_frac": 0.3888888888888889,
+    "rms_contrast_median": 0.24428595283963372,
+    "lap_var_median": 29713.937061522898
+  },
+  "Autumn-coloured deciduous forest": {
+    "n_images": 19,
+    "by_split": {
+      "train": 11,
+      "valid": 3,
+      "test": 5
+    },
+    "locations": {
+      "SB": 19
+    },
+    "people_mean": 2.0,
+    "empty_frac": 0.0,
+    "rms_contrast_median": 0.21527044285812205,
+    "lap_var_median": 26675.913847412015
+  }
+}
