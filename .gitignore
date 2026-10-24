@@ -1,22 +1,5 @@
 # data and secrets
-data/*
-# exception: only the 128px and 640px NII-CU-MAPD npy shards are committed (see research/datasets/)
-# everything else under data/ (including data/npy/.../1280) stays ignored on purpose.
-# git note: a fully-excluded parent dir (plain "data/") can never be re-included by
-# deeper "!" rules, so this uses "exclude contents, then re-include one entry" at
-# every level instead of a single "data/" + a pile of "!data/npy/**" rules.
-!data/npy/
-data/npy/*
-!data/npy/nii-cu-mapd/
-data/npy/nii-cu-mapd/*
-!data/npy/nii-cu-mapd/rgb/
-!data/npy/nii-cu-mapd/thermal/
-data/npy/nii-cu-mapd/rgb/*
-!data/npy/nii-cu-mapd/rgb/128/
-!data/npy/nii-cu-mapd/rgb/640/
-data/npy/nii-cu-mapd/thermal/*
-!data/npy/nii-cu-mapd/thermal/128/
-!data/npy/nii-cu-mapd/thermal/640/
+data/
 .env
 
 # python
