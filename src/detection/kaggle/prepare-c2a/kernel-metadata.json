@@ -1,0 +1,11 @@
+{
+  "id": "sagyzdop/prepare-c2a",
+  "title": "prepare-c2a",
+  "code_file": "../../prepare_c2a.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "dataset_sources": ["rgbnihal/c2a-dataset"]
+}
