@@ -1,6 +1,6 @@
-"""Unpack .npz shards (from prepare_c2a.py / prepare_nii_cu_mapd.py) into an
-ultralytics YOLO folder: images/<split>/*.png, labels/<split>/*.txt, plus a
-data yaml. ultralytics reads image files, not arrays, so this runs once before
+"""Unpack .npz shards (from prepare_c2a.py / prepare_nii_cu_mapd.py /
+prepare_rgbtdroneperson.py) into an ultralytics YOLO folder:
+images/<split>/*.png, labels/<split>/*.txt, plus a data yaml. ultralytics reads image files, not arrays, so this runs once before
 training. Shards are read one at a time, so RAM stays at one shard.
 
 Usage:

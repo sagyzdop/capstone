@@ -16,7 +16,7 @@ Candidate datasets for aerial person detection (RGB / thermal, disaster-relevant
 | BIRDSAI (2020) | Thermal | No: savanna anti-poaching, mostly night | CDLA-Permissive | 3.7 GB real | [LILA](https://lila.science/datasets/conservationdrones/) | Candidate: thermal backup |
 | AIResQ (2025) | Thermal | Yes: SAR, 9,788 imgs | ? | ? | [Nature Sci. Data](https://www.nature.com/articles/s41597-026-07663-9) | Candidate: full set on request |
 | SARD (2021) | RGB | Yes: actors, pose classes incl. lying | Not stated | 4.4 GB | [IEEE DataPort](https://ieee-dataport.org/documents/search-and-rescue-image-dataset-person-detection-sard) | Rejected: paid subscription |
-| RGBTDronePerson (2023) | RGB + thermal | No: tiny persons | ? | ? | [code](https://github.com/NNNNerd/mmdet-rgbtdroneperson) | Candidate: data link not found |
+| RGBTDronePerson (2023) | RGB + thermal | No: tiny persons (median 11 px), day + night. 6,125 pairs, 640×512 | ? | 1.9 GB | [code](https://github.com/NNNNerd/mmdet-rgbtdroneperson) | Evaluating: downloaded, prepared as npz ([rgbtdroneperson.md](rgbtdroneperson.md)). Labels in the thermal frame; RGB weakly aligned, not usable for RGB-only training |
 | Okutama-Action (2017) | RGB video | No: actions on a field | Non-commercial ? | ? | [GitHub](https://github.com/miquelmarti/Okutama-Action) | Rejected: action labels, not SAR |
 | AIDER (2019) | RGB | Yes | ? | ? | Zenodo 3888300 | Rejected: image-level labels, no person boxes (used inside C2A) |
 | DroneVehicle | RGB + IR | No | ? | ? | — | Rejected: no person class |
