@@ -1,0 +1,4 @@
+raw_data/
+processed_npy/
+processed_npy_256/
+*.zip
