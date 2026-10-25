@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 YOLO = ROOT / "data" / "yolo"
 C2A_POSE = ROOT / "data/raw/c2a/extracted/new_dataset3/All labels with Pose information/labels"
 POSES = ["bent", "kneeling", "lying", "sitting", "upright"]  # C2A readme order
-DATASETS = {"hit-uav": "thermal", "c2a": "rgb", "wisard-ir": "thermal", "wisard-vis": "rgb"}
+DATASETS = {"hit-uav": "thermal", "c2a": "rgb", "wisard-ir": "thermal", "wisard-vis": "rgb", "sard": "rgb"}
 SIZE_BINS = [0, 8, 12, 16, 24, 32, 64, 1e9]
 QUALITY_SIDE = 640  # sharpness is measured after resizing to this long side so datasets compare
 
@@ -309,7 +309,7 @@ def wisard_pairing():
 
 # --- plots -------------------------------------------------------------------------------------
 # Colours follow the dataset, never its rank (validated categorical palette, light surface).
-COLOR = {"hit-uav": "#2a78d6", "c2a": "#eb6834", "wisard-ir": "#1baf7a", "wisard-vis": "#eda100"}
+COLOR = {"hit-uav": "#2a78d6", "c2a": "#eb6834", "wisard-ir": "#1baf7a", "wisard-vis": "#eda100", "sard": "#9b59b6"}
 TIME_COLOR = {"day": "#eb6834", "night": "#2a78d6"}
 ORDINAL_BLUE = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"]  # light -> dark
 BOX = "#eda100"  # label boxes drawn on images
