@@ -102,8 +102,20 @@ What we need from the Robotics team. They have not reviewed it yet.
 | Stop on its own when commands stop arriving, for example after a dropped link | Proposed |
 | Stream RGB and thermal as JPEG frames, 640×512 at 5 FPS each ([Streams](#streams)). If the operator drives by this video, camera-to-screen plus command delay should stay under about 300 ms | Proposed |
 | Two-way audio with the victim | Proposed |
-| Carry the same cameras, Pi and WiFi adapter as the drone, plus a microphone, speaker and GPS module | Proposed |
+| Carry the equipment below | Proposed |
 | Report its GPS position, battery and health | Proposed |
+
+Proposed equipment. The drone carries the same, minus the audio; the specs come from [Streams](#streams). Example parts fit the spec but haven't been bought or tested.
+
+| Item | Spec we need | Example part |
+| --- | --- | --- |
+| Thermal camera | LWIR, 640×512, about 40° HFOV, USB (UVC) output so the Pi reads it like a webcam | FLIR Boson 640 with its USB module. Lenses come in fixed fields of view, and the lens sets the drone's ceiling for a standing person: 50° gives about 39 m, 32° about 63 m but less ground. |
+| RGB camera | At least 1280 px wide, about 66 to 72° HFOV, CSI or USB | Raspberry Pi Camera Module 3, standard lens (66° HFOV, 4608×2592). It is 16:9, so the stream is 1280×720 on the drone and 640×360 on the robot instead of 5:4; person size depends only on width and HFOV, so the detection numbers hold. |
+| Computer | Raspberry Pi 5. No detection runs on it; it encodes JPEG and streams. | Raspberry Pi 5, 4 GB |
+| WiFi | USB adapter on 5 GHz, with an external antenna | MT7921AUN adapter (about 350 Mbit/s real), for example the Alfa AWUS036AXML |
+| GPS and compass | GPS module with a built-in compass, UART | u-blox NEO-M8N or M9N drone GPS module. About 2 to 5 m accuracy, enough to draw the robot on the map. |
+| Microphone and speaker | One USB speakerphone with echo cancellation, so the victim doesn't hear their own voice back | Any USB conference speakerphone |
+| Drive, motors, battery | The Robotics team's design | |
 
 The robot does not talk to the drone. Both report to the station, which draws the robot's GPS position on the drone footage and the map. That is enough to steer by; the robot's video helps up close.
 
@@ -115,7 +127,7 @@ Known robot facts, with source and date:
 | Onboard computer | Raspberry Pi, same as the drone | Robotics team, 2026-10-18 |
 | GPS module | Can be carried | Our team, 2026-10-29 |
 
-We assume the same Pi 5 and MT7921AUN adapter as the drone until they confirm. Antenna placement, size and weight are unknown (QUESTIONS.md).
+Antenna placement, size and weight are unknown (QUESTIONS.md).
 
 ## Assumptions
 
