@@ -1,29 +1,37 @@
 # Communication
 
-> **Status:** Draft · **Updated:** 2026-10-18
-
 What the station can send, how fast, and how far. Radii and ranges are estimates from link
-budgets; byte counts and detector times are measured.
+budgets; byte counts are measured.
 
-**Streams.** Thermal 640×512 at 30 FPS, RGB 1280×1024 at 10 FPS, both through YOLO11n at 640 input.
-Together 71 Mbit/s of a 100 Mbit/s budget.
+> [!WARNING]
+> The frame rates here (drone thermal 30 FPS, drone RGB 10 FPS, robot 5 FPS) are predictions, never measured end to end. They
+> come from YOLO11n detector timings; the station now runs YOLO26, and the laptop test in
+> [../datasets/](../datasets/README.md#test-on-the-station-laptop) replaces them. The robot's byte counts
+> are scaled from the drone's, not measured.
+
+**Streams.** Drone and robot carry the same cameras and send the same kind of stream: JPEG frames,
+RGB and thermal separately. Drone: thermal 640×512 at a predicted 30 FPS, RGB 1280×1024 at a predicted
+10 FPS, tiled to 640 on the station. Robot: both at 640×512 and 5 FPS, since its people are close and
+large. Together about 82 Mbit/s of a 100 Mbit/s budget. Why each resolution: [SPEC.md](../../SPEC.md#streams).
 
 **Range.** 100 Mbit/s holds to about 348 m and the working range is 20 to 120 m, so distance is not
 the limit. Rubble is: one dense concrete wall costs 10 to 30 dB.
 
-**Hardware.** A Raspberry Pi on both endpoints with a USB WiFi adapter and an antenna on the
-airframe. The Pi's onboard radio is not enough.
+**Hardware.** The same Raspberry Pi, USB WiFi adapter and external antenna on the drone and the
+robot. The Pi's onboard radio is not enough.
 
 ## Streams
 
 | Stream | Bytes/frame | Send @100 Mb/s | Detect | FPS | Bandwidth |
 | --- | --- | --- | --- | --- | --- |
-| Thermal 640×512 | 139 KiB | 11 ms | 12.4 ms | 30 | 34 Mbit/s |
-| RGB 1280×1024 | 454 KiB | 37 ms | 12.4 ms | 10 | 37 Mbit/s |
+| Drone thermal 640×512 | 139 KiB | 11 ms | 12.4 ms | 30 | 34 Mbit/s |
+| Drone RGB 1280×1024 | 454 KiB | 37 ms | 6 tiles × 12.4 ms | 10 | 37 Mbit/s |
+| Robot thermal 640×512 | 139 KiB | 11 ms | 12.4 ms | 5 | 6 Mbit/s |
+| Robot RGB 640×512 | about 114 KiB (¼ of 1280) | 9 ms | 12.4 ms | 5 | 5 Mbit/s |
 
 Byte counts come from re-encoding the repo's own SAR imagery at each resolution. Detect times are
-`ms_per_image_median` from [assets/audit/eval/](../datasets/assets/audit/eval/), measured on an M4.
-FPS is set by the detector, not the link: 640 input is the AP50 peak on thermal at 0.872, and going
+the YOLO11n timings from the earlier [dataset audits](../datasets/README.md#what-the-earlier-audits-found), measured on an
+Apple Silicon laptop. FPS is set by the detector, not the link: 640 input is the AP50 peak on thermal at 0.872, and going
 to 1280 loses 12 points because the model has not seen people that large.
 
 Anything above 1280 transmits fine and buys nothing. Coverage is `2·altitude·tan(HFOV/2)`, which has
@@ -44,15 +52,20 @@ Areas as square patches, since that is how a site gets talked about. RGB at 72°
 | 40 m | 58 × 44 m | 50 × 50 m | 10 | 30 | 118 × 118 m |
 | 49 m | 71 × 53 m | 62 × 62 m | 8 | 24 | 131 × 131 m |
 
-Thermal at 40 m is 26 × 26 m, half the RGB footprint, because its 40° field of view is half as wide.
-Both see the same ground.
+Thermal at 40 m is 29 × 23 m (26 × 26 m as a square): half as wide as RGB, because its 40° field
+of view is half as wide, and about a quarter of the area. The thermal view sits inside the RGB view,
+so the RGB edges are covered by one camera only.
 
-**49 m is the ceiling**, set by the 8 px detection floor for a standing person. Thermal and RGB reach
-it at the same altitude. Above it nobody is detected whatever the sensor.
+**49 m is the ceiling** with these cameras, set by the 8 px detection floor for a standing person
+(10 px, the safer floor, is at 40 m). Thermal and RGB reach it at the same altitude. A lying person
+is about twice as large from above, so thermal still sees them to about 80 m. A narrower lens raises
+the ceiling but covers less ground. Real SAR datasets fly at 40 to 65 m; the comparison with each
+dataset is in [../datasets/](../datasets/README.md#how-high-the-drone-can-fly).
 
 One hover at 40 m covers about 0.0025 km² and never grows. An urban cell sector is roughly 28 km²,
-so hover only works once an operator narrows the sector to a specific building. That is the
-assumption in [open-questions.md](../../open-questions.md): the station searches nothing.
+so hover only works once an operator narrows the sector to a specific building, and the station
+searches nothing. That is the current [spec](../../SPEC.md#system); a vehicle that keeps moving until
+the drone finds the victims is proposed in [QUESTIONS.md](../../QUESTIONS.md).
 
 ## Link
 
@@ -75,31 +88,34 @@ figure is the one to design against.
 | --- | --- | --- | --- |
 | Drone → station | Thermal JPEG 640×512 | 30 FPS | 34 Mbit/s |
 | Drone → station | RGB JPEG 1280×1024 | 10 FPS | 37 Mbit/s |
-| Robot → station | 720p30 H.264, audio, telemetry | ~10 FPS | 2.6 Mbit/s |
-| Station → robot | Path / waypoints | On change | Negligible |
+| Robot → station | Thermal JPEG 640×512 | 5 FPS | 6 Mbit/s |
+| Robot → station | RGB JPEG 640×512 | 5 FPS | 5 Mbit/s |
+| Robot ↔ station | Two-way audio, telemetry | Continuous | Under 1 Mbit/s |
+| Station → robot | Drive commands from the operator | While driving | Negligible |
 | Station → rescue team | Victim location and status | On detection | Negligible |
 
-The drone's video goes to a detector as JPEG frames. The robot's goes to a human, so H.264 carries it
-in 2.6 Mbit/s.
+Both platforms send JPEG frames because every frame goes to a detector. If the link gets tight, the
+robot can switch to H.264 (a 720p30 stream with audio and telemetry is about 2.6 Mbit/s) at some cost
+to detection.
 
-Total load is about 74 Mbit/s, leaving roughly 25 Mbit/s of headroom. The operator UI is rendered on
-the station's own screen and costs nothing on the network; the headroom covers reassociation overhead,
-the robot's thermal stream if it goes uncompressed, and margin for a degraded link.
+Total load is about 82 Mbit/s, leaving roughly 18 Mbit/s of headroom. The operator UI is rendered on
+the station's own screen and costs nothing on the network; the headroom covers reassociation overhead
+and margin for a degraded link.
 
 ## Hardware
 
-| Option | Real 5 GHz | Margin over 74 Mbit/s | Verdict |
+| Option | Real 5 GHz | Margin over the drone's 71 Mbit/s | Verdict |
 | --- | --- | --- | --- |
 | Pi Zero 2W onboard | 2.4 GHz only | — | Out |
 | Pi 4 / 5 onboard | 80–110 Mbit/s | 1.1–1.5× | Too tight |
-| Pi + USB RTL8812AU | ~140 Mbit/s | 1.9× | Works, needs a DKMS driver |
-| Pi + USB MT7921AUN | ~350 Mbit/s | 4.7× | Recommended |
-| Pi 5 + M.2 AX210 | ~650 Mbit/s | 8.8× | Best, native driver |
+| Pi + USB RTL8812AU | ~140 Mbit/s | 2.0× | Works, needs a DKMS driver |
+| Pi + USB MT7921AUN | ~350 Mbit/s | 4.9× | Recommended |
+| Pi 5 + M.2 AX210 | ~650 Mbit/s | 9.2× | Best, native driver |
 
 **A Pi 5 with an MT7921AUN and a 5 GHz antenna on the airframe.** About $110–135 and 80 g mounted.
 The Robotics team confirmed a Pi for the robot, so both endpoints share a bill of materials.
 
-The onboard radio fails on margin: 74 Mbit/s of load against 80 to 110 measured is most of the
+The onboard radio fails on margin: the drone's 71 Mbit/s of load against 80 to 110 measured is most of the
 capacity gone before any range loss, and throughput falls off a cliff below the top MCS. An ESP32 on
 the flight controller is out on two counts, being 2.4 GHz only at 11 to 20 Mbit/s, and unable to
 JPEG-encode at 30 FPS while flying. The Pi also records to SD, so a dropped link loses no frames.
@@ -129,35 +145,23 @@ Ubuntu: `nmcli device wifi hotspot ifname wlan0 ssid "capstone-sar" password "<p
 | Field | State |
 | --- | --- |
 | Detection output | Agreed: JSON `[{"image", "bbox_xyxy", "conf"}]`, written by `src/detection/detect.py:16` |
-| Frame container | Proposed: one JPEG per frame, timestamp in the filename |
+| Frame container | Agreed: one JPEG per frame, with a timestamp and GPS / heading ([SPEC.md](../../SPEC.md#streams)) |
 | Coordinate frame | Open: `bbox_xyxy` is image pixels today, ground metres wanted |
 | Transport | Open: none exists. `detect.py` writes a file, not a socket |
-| Timing | Open: no timestamp in the payload, so latency is unmeasurable |
+| Timing | Open: where the timestamp and GPS travel (filename, JPEG header or a sidecar message), and clock sync between the Pis and the station |
 | Loss behaviour | Open: what the station does with a dropped frame |
 
 Robot links need Robotics team review.
 
 ## Open
 
-Blocking, and all in [open-questions.md](../../open-questions.md):
-
-- The thermal model scores AP50 0.872 on HIT-UAV and **0.010 on real WiSARD thermal footage**.
-  Persons there are larger and higher contrast, so this is not resolution. Retraining on HIT-UAV plus
-  WiSARD is the most valuable experiment open to us.
-- Link loss is unimplemented. The station should keep working from its last detections and the drone
-  needs a return path.
-- No drone or camera chosen. Which Pi, which radio, which field of view.
-- Handed a cell sector instead of a building, the drone would have to search rather than hover.
-
-Non-blocking: measured throughput through rubble, flight time at 20 to 40 m, whether the robot's
-thermal stream is compressed, whether audio is still in scope.
+All open questions, including the link ones, are in [QUESTIONS.md](../../QUESTIONS.md).
 
 ## Measuring
 
 ```bash
 iperf3 -c <drone-ip> -t 60 -i 1        # drone runs iperf3 -s, at hover altitude
-python3 -c "import json;print(json.load(open('research/datasets/assets/audit/eval/hituav-model_hituav-test.json'))[2])"
-sips -z 512 640 research/datasets/assets/audit/wisard_pair.jpg --out /tmp/t.jpg && stat -f%z /tmp/t.jpg
+sips -z 512 640 research/datasets/assets/wisard_pair.jpg --out /tmp/t.jpg && stat -f%z /tmp/t.jpg
 ```
 
 Throughput at 20, 50, 100, 200 m, then again through one and two rubble walls.
@@ -169,6 +173,7 @@ Throughput at 20, 50, 100, 200 m, then again through one and two rubble walls.
 
 ## Sources
 
+- YOLO26 replaces YOLO11; its specs are in [SPEC.md](../../SPEC.md#detection).
 - Throughput against RSSI, 802.11ax 5 GHz 80 MHz: [Candela Wi-Fi station test report](https://reports.candelatech.com/reports/Wi-Fi%20Station%20Testing/Candela%20Wi-Fi%20Station%20Test%20Solution.pdf).
 - Real-world rates by band: [HP knowledge base](https://h30434.www3.hp.com/t5/Laptops-Knowledge-Base/Real-world-WiFi-speed-and-flex-repeater-booster-system/ta-p/9110464), [Cisco](https://www.cisco.com/c/en/us/support/docs/wireless-mobility/wireless-lan-wlan/212892-802-11ac-wireless-throughput-testing-and.html).
 - YOLO11 variant specs: [Ultralytics](https://docs.ultralytics.com/models/yolo11/).

@@ -1,131 +1,109 @@
 # Agentic Aerial-Ground Robot Collaboration for Victim Detection and Triage
 
-![status](https://img.shields.io/badge/status-in%20development-yellow)
+CSCI 408 senior project, Group 19.
 
-> **Status:** Draft · **Updated:** 2026-10-18
+After an earthquake, roads, buildings and phone networks are damaged, and sending people into an unassessed area is slow and dangerous. A vehicle carries a laptop (the station), a drone and a ground robot to a collapse site. The drone streams RGB and thermal video to the station, which finds victims and shows them on a map. The operator drives the robot to a victim to check their state and talk to them.
 
-CSCI 408 senior project (Group 19). A vehicle carrying a laptop **station**, a **drone** and a **ground robot** drives to a spot where victims are likely to be after an earthquake. The drone hovers and streams video to the station, which detects and tags victims, plans a path, and sends the robot to verify the victim's status and talk to them.
+| File | What's in it |
+| --- | --- |
+| [TODO.md](TODO.md) | What to do next. Start here |
+| [SPEC.md](SPEC.md) | What we are building: agreed decisions, assumptions, interfaces, operator map |
+| [QUESTIONS.md](QUESTIONS.md) | Everything not settled, with the agenda for the next supervisors' meeting on top |
+| [research/datasets/](research/datasets/) | Training and test data, results, laptop test plan, earlier dataset audits |
+| [research/communication/](research/communication/) | Link budget: frame sizes, coverage, WiFi range and setup |
+| [research/literature/](research/literature/) | Literature review (CSV) |
+| [src/detection/](src/detection/) | Code |
+| [paper/](paper/) | Final report (LaTeX) and `references.bib` |
 
-## System at a glance
+## Deployment diagram
+
+What runs where, and what each WiFi link carries. Mermaid has no UML deployment syntax, so this is a flowchart drawn in that style.
 
 ```mermaid
 flowchart LR
-    subgraph V["Vehicle (parked on site)"]
-        S["Station (laptop)<br/>detection · path planning · orchestration"]
+    subgraph DR["Drone: Raspberry Pi"]
+        DC["RGB camera<br/>thermal camera"]
+        DT["GPS, compass,<br/>barometer"]
+        DS["Frame streamer<br/>(+ SD recording)"]
+        DC --> DS
+        DT --> DS
     end
-    D["Drone (hovering)"] -- "video + images (WiFi)" --> S
-    S -- "path / waypoints (WiFi)" --> R["Ground robot"]
-    R -- "video, thermal, audio (WiFi)" --> S
-    R -. "two-way audio" .- X(("Victim"))
+    subgraph VE["Vehicle: station laptop, WiFi access point"]
+        RGB["RGB detector<br/>YOLO26"]
+        TH["Thermal detector<br/>YOLO26"]
+        FU["Late fusion<br/>+ tracking"]
+        MAP["Operator map"]
+        RGB --> FU
+        TH --> FU
+        FU --> MAP
+    end
+    subgraph RO["Ground robot: Raspberry Pi"]
+        RC["RGB camera<br/>thermal camera"]
+        RA["Microphone<br/>speaker"]
+        RN["Drive control"]
+    end
+    DS -->|"RGB + thermal frames, telemetry<br/>(WiFi 5 GHz)"| RGB
+    DS --> TH
+    RC -->|"RGB + thermal video, status, GPS<br/>(WiFi)"| RGB
+    RC --> TH
+    MAP -->|"drive commands from the operator (WiFi)"| RN
+    RA <-->|"two-way audio (WiFi)"| MAP
 ```
 
-## Concept of operations
+## Sequence diagram: one mission
 
 ```mermaid
 sequenceDiagram
     participant T as Rescue team
     participant C as Mobile carrier
-    participant S as Station
+    participant O as Operator + station
     participant D as Drone
     participant R as Ground robot
     participant V as Victim
-    T->>C: Request last known locations in the area
-    C-->>T: Candidate zone
-    T->>S: Drive to predefined location and set up
-    D->>S: Video and images (WiFi)
-    S->>S: Detect and tag victim
-    S->>R: Path to tagged location
-    R->>S: Video, thermal, audio
-    R-->>V: Two-way communication
-    S->>T: Victim status and location
+    T->>C: Request last known phone locations
+    C-->>T: Candidate zone (a cell sector)
+    T->>O: Narrow it to one collapse site, drive there, park
+    O->>D: Launch, hover over the site
+    loop Every frame
+        D->>O: RGB + thermal frames, GPS, altitude, heading
+        O->>O: Detect in each modality, fuse boxes, track, update map
+    end
+    O->>O: Operator confirms a victim marker
+    loop Until the robot reaches the victim
+        O->>R: Drive commands from the operator
+        R->>O: RGB + thermal video, status, position
+    end
+    R-->>V: Two-way audio with the operator
+    O->>O: Operator sets status and triage colour
+    O->>T: Victim locations and status
 ```
 
-1. **Pre-mission:** the team requests carrier location data and picks a site.
-2. **Scene 1 (aerial):** the vehicle parks, the drone hovers and streams, the station detects and tags a victim.
-3. **Scene 2 (ground):** the station plans a path, the robot follows it, verifies the victim's status, and communicates with them.
+## State diagram: a victim marker
 
-Roads, structures and communications are damaged after an earthquake, so sending humans into
-unassessed areas is dangerous and slow.
+What the station tracks for each victim. A marker stays on the map after the person leaves the drone's frame, with the time they were last seen.
 
-## Scope
+```mermaid
+stateDiagram-v2
+    [*] --> Detected: box from RGB, thermal or both
+    Detected --> Rejected: operator says false positive
+    Detected --> Confirmed: operator confirms
+    Confirmed --> Dispatched: operator drives the robot there
+    Dispatched --> Verified: robot reaches the victim
+    Verified --> Triaged: operator sets START colour
+    Rejected --> [*]
+    Triaged --> [*]
+```
 
-- [ ] Victim detection from drone imagery (RGB / thermal as available)
-- [ ] Station-side path planning for the ground robot
-- [ ] Station-side orchestration
-- [ ] Robot-side verification (thermal, audio) and triage signals
-- [ ] Evaluation against a baseline
+## Team
 
-**Out of scope:** robot locomotion and hardware design (Robotics team), carrier-side location services (assumed available).
+| Name | Email |
+| --- | --- |
+| Askar Matayev | askar.matayev@nu.edu.kz |
+| Ruslan Nagimov | ruslan.nagimov@nu.edu.kz |
+| Yelzhan Rakhimzhanov | yelzhan.rakhimzhanov@nu.edu.kz |
+| Bakhtiyar Yesbolsyn | bakhtiyar.yesbolsyn@nu.edu.kz |
+| Nurbek Baktygali | nurbek.baktygali@nu.edu.kz |
 
-## Repository map
+Supervisors: Adnan Yazici (main, adnan.yazici@nu.edu.kz), Enver Ever (enverevermetu@gmail.com), Muhammad Toaha Khan (khan@metu.edu.tr).
 
-| Path                                   | Purpose                                               |
-| -------------------------------------- | ----------------------------------------------------- |
-| [station/](station/)                   | Station: detection, path planning, orchestration      |
-| [drone/](drone/)                       | Drone: hovering sensing platform                      |
-| [ground-robot/](ground-robot/)         | Ground robot and Robotics team collaboration          |
-| [src/](src/)                           | Source code                                           |
-| [research/](research/)                 | Literature, datasets, and the communication link budget |
-| [meeting-notes/](meeting-notes/)       | All meetings (supervisors, Robotics team, internal)   |
-| [templates/](templates/)               | Templates for recurring files                         |
-| [paper/](paper/)                       | Final report (LaTeX)                                  |
-| [GLOSSARY.md](GLOSSARY.md)             | Every term the project uses, grouped by area          |
-| [open-questions.md](open-questions.md) | Open questions and unverified assumptions             |
-| [CHANGELOG.md](CHANGELOG.md)           | Decisions and changes, newest first                   |
-
-## Status
-
-- [x] Initial architecure decided – stationary drone, tumblweed robot deployed at site, station as orchestrator
-- [ ] Concept of operations agreed by the team
-- [ ] Station–robot interface agreed with the Robotics team
-- [x] Datasets selected – HIT-UAV (thermal), C2A (RGB); see [research/datasets/datasets.md](research/datasets/datasets.md)
-- [ ] Detection baseline running
-- [ ] End-to-end demo (simulated or recorded data)
-- [ ] Final report
-
-## Contacts
-
-### Team
-
-| Name                 | Email                          | Role |
-| -------------------- | ------------------------------ | ---- |
-| Askar Matayev        | askar.matayev@nu.edu.kz        | -    |
-| Ruslan Nagimov       | ruslan.nagimov@nu.edu.kz       | -    |
-| Yelzhan Rakhimzhanov | yelzhan.rakhimzhanov@nu.edu.kz | -    |
-| Bakhtiyar Yesbolsyn  | bakhtiyar.yesbolsyn@nu.edu.kz  | -    |
-| Nurbek Baktygali     | nurbek.baktygali@nu.edu.kz     | -    |
-
-### Supervisors
-
-| Name                | Email                   | Role            |
-| ------------------- | ----------------------- | --------------- |
-| Adnan Yazici        | adnan.yazici@nu.edu.kz  | Main Supervisor |
-| Enver Ever          | enverevermetu@gmail.com | Supervisor      |
-| Muhammad Toaha Khan | khan@metu.edu.tr        | Supervisor      |
-
-
-### Robotics team
-
-
-| Name              | Email                       | Role       |
-| ----------------- | --------------------------- | ---------- |
-| Gourav Devappa    | gourav.devappa@nu.edu.kz    | Supervisor |
-| Mirat Serik       | mirat.serik@nu.edu.kz       | -          |
-| Adil Ismagambetov | adil.ismagambetov@nu.edu.kz | -          |
-| Yevgeniy Dikun    | yevgeniy.dikun@nu.edu.kz    | -          |
-
-
-<details>
-<summary><strong>Conventions</strong></summary>
-
-- Every Markdown doc starts with a title and a status line: `> **Status:** Draft | In review | Agreed · **Updated:** YYYY-MM-DD`.
-- Dates use ISO format (`YYYY-MM-DD`). File names use `kebab-case`.
-- Record every decision or change in [CHANGELOG.md](CHANGELOG.md), including its rationale.
-- Add unresolved questions to **Open questions** in [open-questions.md](open-questions.md). Once answered, move them to **Resolved** and log the answer in the changelog.
-- Add anything we are treating as true but have not verified to **Assumptions** in the same file, with the risk if it turns out false.
-- Recurring files (meeting notes, literature notes) start from [templates/](templates/).
-- Cite only keys that exist in [research/literature/references.bib](research/literature/references.bib).
-- Define new terms in [GLOSSARY.md](GLOSSARY.md) rather than explaining them inline in several places.
-- Do not copy the Robotics team's internals. Link to their docs and record dated facts in [ground-robot/](ground-robot/).
-
-</details>
+Robotics team, who build the ground robot: Gourav Devappa (supervisor, gourav.devappa@nu.edu.kz), Mirat Serik (mirat.serik@nu.edu.kz), Adil Ismagambetov (adil.ismagambetov@nu.edu.kz), Yevgeniy Dikun (yevgeniy.dikun@nu.edu.kz).
