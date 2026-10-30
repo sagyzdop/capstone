@@ -26,6 +26,7 @@ runs/*/*/*
 !runs/*/*/results.csv
 !runs/*/*/results.png
 !runs/*/*/args.yaml
+!runs/*/*/data.yaml
 !runs/*/*/results.md
 !runs/*/*/*.png
 !runs/*/*/labels.jpg
