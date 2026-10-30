@@ -1,0 +1,46 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 570,
+  "persons": 732,
+  "ap": 0.953,
+  "precision": 0.923,
+  "recall": 0.922,
+  "recall_by_size": {
+   "0-8": {
+    "n": 3,
+    "recall": 0.0
+   },
+   "8-12": {
+    "n": 1,
+    "recall": 0.0
+   },
+   "12-16": {
+    "n": 4,
+    "recall": 0.25
+   },
+   "16-24": {
+    "n": 28,
+    "recall": 0.714
+   },
+   "24-32": {
+    "n": 80,
+    "recall": 0.787
+   },
+   "32-64": {
+    "n": 336,
+    "recall": 0.932
+   },
+   "64-1e+09": {
+    "n": 280,
+    "recall": 0.993
+   }
+  },
+  "ms_per_image_median": 4.4,
+  "model": "best.pt",
+  "dataset": "sard",
+  "split": "test"
+ }
+]

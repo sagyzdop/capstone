@@ -8,9 +8,12 @@ Start here. Tick a line when it's done, and delete it once nobody needs to see i
 - [x] Train YOLO26n RGB and fill its own-val results ([results](research/datasets/README.md#yolo26n-rgb)).
 - [x] Train YOLO26n thermal and fill its own-val results ([results](research/datasets/README.md#yolo26n-thermal)).
 - [ ] Retrain YOLO26n thermal for 30 to 50 epochs (or with early stopping): val AP50 peaked at epoch 28 and fell after.
-- [ ] Score both models on WiSARD and HERIDAL (download the WiSARD sample again; it was only kept in the dropped npz format).
+- [x] Train YOLO26s RGB and thermal and compare with nano ([results](research/datasets/README.md#yolo26s-against-yolo26n)): small barely helps, nano stays the default.
+- [x] Score the RGB models on HERIDAL ([results](research/datasets/README.md#heridal)): AP50 about 0.01, both sizes, tiled or not.
+- [ ] Decide how to fix RGB on tiny people in natural terrain: more RGB training data, or train on part of HERIDAL split by location code (then WiSARD is the only held-out RGB test).
+- [ ] Score both models on WiSARD (download the WiSARD sample again; it was only kept in the dropped npz format).
 - [x] Check whether the RGB model saw RGBTDronePerson's RGB images. The first one did, and scored AP50 0.06 on them; `train.py` now trains RGB without them ([why](research/datasets/README.md#rgbtdroneperson)).
-- [ ] Test on data the models never trained on: convert WiSARD and HERIDAL with `src/detection/prepare.py`, run `src/detection/eval_sizes.py`, fill the results table. For HERIDAL, use the 57 test images without a train twin.
+- [ ] Test on WiSARD, which the models never trained on: convert it to `data/yolo/`, run `src/detection/eval_sizes.py` with and without `--tile 640`, fill the results table.
 - [ ] Run the laptop test, nano then small ([steps](research/datasets/README.md#test-on-the-station-laptop)). Replace the predicted 30 / 10 FPS in [SPEC.md](SPEC.md#streams) with what you measure.
 
 ## Research

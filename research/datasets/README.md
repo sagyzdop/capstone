@@ -75,7 +75,7 @@ WiSARD and HERIDAL are the held-out real-SAR tests. No training set comes from t
 - WiSARD sample: one synchronised flight, `210417_MtErie_Enterprise` (Mt Erie, Washington, 17 April 2021). 264 frames of the same four volunteers on forest and rocky clearing in daylight, RGB 3840×2160 and thermal 640×512, 1,022 and 1,006 persons. The full set is 40.5 GB with 15,453 synced pairs.
 - HERIDAL: real SAR in Croatian karst, maquis, pine forest, ravines, snow and one city park; volunteers stand, walk, sit and lie. We have the Roboflow export ["Heridal Human Detection" v4](https://universe.roboflow.com/drone-internship/heridal-human-detection) (167 MB, CC BY 4.0), which stretch-resized every frame to 640×640. The 8.3 GB [Zenodo original](https://zenodo.org/records/5662351) (about 4000×3000, CC BY 3.0) would carry about 29× more pixels per person. In the export, all 3,073 boxes use category id 1; map everything to `person`.
 
-Both need care. HERIDAL's shipped split leaks: 44 of its 101 test images have a near-identical frame in train or valid. Test on the 57 without a twin, or re-split by location code. Its test split also has no empty images, so measure image-level false positives on valid. WiSARD is one site and four actors, so read it as a sanity check, not a benchmark.
+Both need care. HERIDAL's shipped split leaks: 44 of its 101 test images have a near-identical frame in train or valid. That only matters if we train on it; as a pure test set, all 1,579 frames are unseen, so `convert.py` keeps one frame per distinct view (1,275) instead. Its test split also has no empty images, so it can't measure false alarms on empty ground; the 1,275 include 525 empty frames. WiSARD is one site and four actors, so read it as a sanity check, not a benchmark.
 
 ## Conversion and training
 
@@ -86,6 +86,7 @@ R=data/raw/sard; python src/detection/prepare.py sard --person-ids 0 --split tra
 R=data/raw/hit-uav; python src/detection/prepare.py hit-uav --person-ids 0 --split train=$R/images/train:$R/labels/train --split val=$R/images/val:$R/labels/val --split test=$R/images/test:$R/labels/test
 python src/detection/convert.py nii-cu-mapd data/raw/nii-cu-mapd/4-channel
 python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson
+python src/detection/convert.py heridal data/raw/heridal
 ```
 
 Then train both models and score them on every val and test split:
@@ -100,10 +101,10 @@ Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopp
 
 | Model | Modality | Own val | WiSARD | HERIDAL |
 | --- | --- | --- | --- | --- |
-| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | TBD | TBD |
+| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | TBD | AP50 0.007, recall 0.02 ([below](#heridal)) |
 | YOLO26n | Thermal | AP50 0.650, recall 0.62 ([below](#yolo26n-thermal)) | TBD | n/a (RGB only) |
-| YOLO26s | RGB | TBD | TBD | TBD |
-| YOLO26s | Thermal | TBD | TBD | n/a |
+| YOLO26s | RGB | AP50 0.889, recall 0.85 ([below](#yolo26s-against-yolo26n)) | TBD | AP50 0.012, recall 0.03 ([below](#heridal)) |
+| YOLO26s | Thermal | AP50 0.666, recall 0.64 ([below](#yolo26s-against-yolo26n)) | TBD | n/a |
 
 Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights: `runs/{rgb,thermal}/yolo26n_e100/weights/best.pt` on the lab computer (git-ignored), with `scores.md` next to them.
 
@@ -193,6 +194,62 @@ Recall by person size, conf 0.25:
 - HIT-UAV scores are optimistic: 31% of its val/test images are near-duplicates of train.
 - As for RGB, these are the training datasets' own splits. The held-out WiSARD thermal score is the real test; an earlier HIT-UAV-only model scored 0.87 on HIT-UAV test and 0.01 on WiSARD.
 - Raw output: `runs/thermal/yolo26n_e100/scores.md` and `runs/thermal/yolo26n_e100/eval/*.json` on the lab computer.
+
+### YOLO26s against YOLO26n
+
+Same data and settings as nano, with `--model yolo26s.pt`. Fewer epochs, since nano had stopped improving: RGB 70 (`best.pt` from epoch 55), thermal 50 (`best.pt` from epoch 28, the same epoch as nano). Speed isn't compared here: on the RTX 5080 `eval_sizes.py`'s ms per image is mostly image loading. The [laptop test](#test-on-the-station-laptop) measures it.
+
+| Data | Split | AP50 n | AP50 s | Recall at conf 0.25 n | Recall at conf 0.25 s |
+| --- | --- | --- | --- | --- | --- |
+| RGB, both val sets | val | 0.907 | 0.889 | | |
+| SARD | val | 0.952 | 0.948 | 0.934 | 0.925 |
+| SARD | test | 0.945 | 0.946 | 0.932 | 0.922 |
+| NII-CU-MAPD RGB | val | 0.834 | 0.788 | 0.780 | 0.771 |
+| Thermal, all three val sets | val | 0.650 | 0.666 | | |
+| RGBTDronePerson | val | 0.584 | 0.602 | 0.583 | 0.616 |
+| NII-CU-MAPD thermal | val | 0.986 | 0.977 | 0.971 | 0.962 |
+| HIT-UAV | val | 0.911 | 0.914 | 0.898 | 0.879 |
+| HIT-UAV | test | 0.921 | 0.934 | 0.905 | 0.905 |
+
+AP50 from `scores.md` (ultralytics), recall from `eval_sizes.py` at imgsz 640.
+
+- RGB: small is no better, and is worse on NII-CU-MAPD, the set with drone-sized people.
+- Thermal: small gains about 1.5 AP50 overall, all of it on RGBTDronePerson (recall 0.58 to 0.62, mostly at 8 to 16 px). On the other sets the two are within noise.
+- Both thermal models peak at epoch 28, and a model with 3× the parameters barely helps, so the limit is the training data, not the model size. Nano stays the default; the held-out [HERIDAL](#heridal) result agrees.
+- Raw output: `runs/{rgb/yolo26s_e70,thermal/yolo26s_e50}/scores.md` and `eval/*.json`.
+
+### HERIDAL
+
+The first held-out test, RGB only. Both RGB models fail on it.
+
+`convert.py heridal` turns the Roboflow export into two splits under `data/yolo/heridal`:
+
+- Un-stretched: Roboflow squashed the 4:3 frames to 640×640, which makes people 25% narrower than they are, so every frame is resized back to 853×640. Boxes keep their normalised coordinates.
+- `unique`: one frame per distinct view, 1,275 frames (2,462 persons, 525 empty frames). Consecutive frames often show the same ground, and 304 of the 1,579 are near-duplicates (difference hash, the grouping from the earlier audit). This is the main score.
+- `test`: Roboflow's 101-image test split (337 persons, no empty frames), for comparison with published numbers.
+
+Scored with `eval_sizes.py --imgsz 640 1280 --tile 640`. The tile run cuts each frame into two overlapping 640 crops at native size, which is how the drone's RGB will run.
+
+| Model | Split | AP50 at 640 | AP50 at 1280 | AP50 tiled | Recall at conf 0.25, tiled | Precision at conf 0.25, tiled |
+| --- | --- | --- | --- | --- | --- | --- |
+| YOLO26n | unique | 0.003 | 0.004 | 0.007 | 0.019 | 0.11 |
+| YOLO26s | unique | 0.008 | 0.006 | 0.012 | 0.029 | 0.13 |
+| YOLO26n | test | 0.007 | 0.013 | 0.012 | 0.030 | 0.20 |
+| YOLO26s | test | 0.003 | 0.003 | 0.008 | 0.030 | 0.09 |
+
+Recall by person size, `unique`, tiled (size in the 853×640 frame, which tiling keeps):
+
+| Model | Under 8 px | 8 to 12 px | 12 to 16 px | 16 to 24 px | 24 to 32 px |
+| --- | --- | --- | --- | --- | --- |
+| YOLO26n | 0.00 (118) | 0.00 (796) | 0.01 (959) | 0.05 (561) | 0.29 (28) |
+| YOLO26s | 0.00 (118) | 0.00 (796) | 0.02 (959) | 0.08 (561) | 0.39 (28) |
+
+- About 97% of people are missed. At 8 to 16 px, the drone's size and 71% of HERIDAL's people, recall is 0 to 2%. Most of the few boxes the models do draw are false alarms.
+- It isn't the conversion or the box style. The labels sit on the people (checked by drawing them), the models skip people who are plainly visible on open grass, and at IoU 0.25 nano tiled still has recall 0.03.
+- Tiling and imgsz 1280 help a little, small helps a little, and none of it matters at this level.
+- Same pattern as the earlier thermal audit ([below](#models-dont-transfer-between-datasets)): high scores on the training sets' own splits, near zero on a new site. The RGB training data can't teach it: SARD's people are mostly over 32 px, and NII-CU-MAPD's small people are all on one baseball field in winter. Neither has people in natural terrain at 10 px.
+- What could close the gap: RGB training data with tiny people in natural terrain, or training on part of HERIDAL itself, split by location code so the test sites stay unseen. Then WiSARD becomes the only fully held-out RGB test. Scale augmentation (a smaller `scale`, copy-paste of small people) helps in either case.
+- Raw output: `runs/rgb/{yolo26n_e100,yolo26s_e70}/eval/heridal-{unique,test}.json`.
 
 ## Test on the station laptop
 
@@ -404,6 +461,6 @@ In [src/detection/](../../src/detection/). Each docstring has full usage. Raw da
 | --- | --- |
 | `detect.py` | Runs a model on an image or folder and writes the station's JSON detections. `python src/detection/detect.py best.pt FOLDER --out detections.json` |
 | `prepare.py` | Converts a YOLO- or COCO-labelled dataset to single-class `person` YOLO under `data/yolo/`. `python src/detection/prepare.py hit-uav --person-ids 0 --split train=IMG_DIR:COCO.json ...` |
-| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities) and RGBTDronePerson (thermal, `uncertain` masked) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
+| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities), RGBTDronePerson (thermal, `uncertain` masked) and HERIDAL (test only, un-stretched to 4:3, one frame per view) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
 | `train.py` | Trains one YOLO26 model per modality on its datasets and scores `best.pt` on every val and test split. `python src/detection/train.py rgb thermal --epochs 100` |
 | `eval_sizes.py` | AP50, recall and recall per person size across `imgsz` values and tiling, on a `data/yolo/` split. `python src/detection/eval_sizes.py MODEL.pt wisard-vis val --imgsz 640 1280 --tile 640 --out OUT.json` |
