@@ -1,0 +1,46 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 571,
+  "persons": 2611,
+  "ap": 0.921,
+  "precision": 0.834,
+  "recall": 0.905,
+  "recall_by_size": {
+   "0-8": {
+    "n": 16,
+    "recall": 0.75
+   },
+   "8-12": {
+    "n": 548,
+    "recall": 0.88
+   },
+   "12-16": {
+    "n": 1045,
+    "recall": 0.909
+   },
+   "16-24": {
+    "n": 858,
+    "recall": 0.921
+   },
+   "24-32": {
+    "n": 136,
+    "recall": 0.904
+   },
+   "32-64": {
+    "n": 7,
+    "recall": 0.714
+   },
+   "64-1e+09": {
+    "n": 1,
+    "recall": 0.0
+   }
+  },
+  "ms_per_image_median": 3.5,
+  "model": "best.pt",
+  "dataset": "hit-uav",
+  "split": "test"
+ }
+]

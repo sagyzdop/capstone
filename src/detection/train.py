@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -47,8 +48,10 @@ def score(weights, mod, run):
     targets = [("all", "val", DATA / f"{mod}.yaml")]
     targets += [(n, s, DATA / f"{n}.yaml") for n in DATASETS[mod] for s in splits(n) if s != "train"]
     for name, split, y in targets:
+        out = run.parent / f"{run.name}-{name}-{split}"
         met = m.val(data=str(y), split=split, imgsz=640, batch=16, plots=False, verbose=False,
-                    project=str(run.parent), name=f"{run.name}-{name}-{split}", exist_ok=True)
+                    project=str(out.parent), name=out.name, exist_ok=True)
+        shutil.rmtree(out, ignore_errors=True)  # ultralytics always makes the folder; with plots off it stays empty
         rows.append({"dataset": name, "split": split, "AP50": met.box.map50, "AP50-95": met.box.map,
                      "P": met.box.mp, "R": met.box.mr})
     df = pd.DataFrame(rows).round(3)

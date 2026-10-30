@@ -1,0 +1,26 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 485,
+  "persons": 891,
+  "ap": 0.839,
+  "precision": 0.901,
+  "recall": 0.78,
+  "recall_by_size": {
+   "32-64": {
+    "n": 424,
+    "recall": 0.795
+   },
+   "64-1e+09": {
+    "n": 467,
+    "recall": 0.767
+   }
+  },
+  "ms_per_image_median": 29.8,
+  "model": "best.pt",
+  "dataset": "nii-cu-mapd-rgb",
+  "split": "val"
+ }
+]
