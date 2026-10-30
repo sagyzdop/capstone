@@ -1,0 +1,34 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 485,
+  "persons": 891,
+  "ap": 0.974,
+  "precision": 0.928,
+  "recall": 0.962,
+  "recall_by_size": {
+   "8-12": {
+    "n": 36,
+    "recall": 0.583
+   },
+   "12-16": {
+    "n": 335,
+    "recall": 0.967
+   },
+   "16-24": {
+    "n": 413,
+    "recall": 0.981
+   },
+   "24-32": {
+    "n": 107,
+    "recall": 1.0
+   }
+  },
+  "ms_per_image_median": 4.1,
+  "model": "best.pt",
+  "dataset": "nii-cu-mapd-thermal",
+  "split": "val"
+ }
+]

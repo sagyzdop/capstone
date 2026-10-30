@@ -1,0 +1,110 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 1275,
+  "persons": 2462,
+  "ap": 0.008,
+  "precision": 0.164,
+  "recall": 0.019,
+  "recall_by_size": {
+   "0-8": {
+    "n": 118,
+    "recall": 0.0
+   },
+   "8-12": {
+    "n": 796,
+    "recall": 0.001
+   },
+   "12-16": {
+    "n": 959,
+    "recall": 0.01
+   },
+   "16-24": {
+    "n": 561,
+    "recall": 0.05
+   },
+   "24-32": {
+    "n": 28,
+    "recall": 0.321
+   }
+  },
+  "ms_per_image_median": 5.0,
+  "model": "best.pt",
+  "dataset": "heridal",
+  "split": "unique"
+ },
+ {
+  "imgsz": 1280,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 1275,
+  "persons": 2462,
+  "ap": 0.006,
+  "precision": 0.132,
+  "recall": 0.019,
+  "recall_by_size": {
+   "0-8": {
+    "n": 118,
+    "recall": 0.0
+   },
+   "8-12": {
+    "n": 796,
+    "recall": 0.0
+   },
+   "12-16": {
+    "n": 959,
+    "recall": 0.011
+   },
+   "16-24": {
+    "n": 561,
+    "recall": 0.057
+   },
+   "24-32": {
+    "n": 28,
+    "recall": 0.179
+   }
+  },
+  "ms_per_image_median": 8.5,
+  "model": "best.pt",
+  "dataset": "heridal",
+  "split": "unique"
+ },
+ {
+  "imgsz": 640,
+  "tile": 640,
+  "iou": 0.5,
+  "images": 1275,
+  "persons": 2462,
+  "ap": 0.012,
+  "precision": 0.13,
+  "recall": 0.029,
+  "recall_by_size": {
+   "0-8": {
+    "n": 118,
+    "recall": 0.0
+   },
+   "8-12": {
+    "n": 796,
+    "recall": 0.001
+   },
+   "12-16": {
+    "n": 959,
+    "recall": 0.017
+   },
+   "16-24": {
+    "n": 561,
+    "recall": 0.077
+   },
+   "24-32": {
+    "n": 28,
+    "recall": 0.393
+   }
+  },
+  "ms_per_image_median": 8.7,
+  "model": "best.pt",
+  "dataset": "heridal",
+  "split": "unique"
+ }
+]
