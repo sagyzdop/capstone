@@ -1,21 +1,22 @@
 # Datasets and detection
 
-Two YOLO26 models on the station, one RGB and one thermal, fused late. The design is in [SPEC.md](../../SPEC.md#detection). This file covers the data we train and test on, training and results, the laptop test, which datasets to add next, and what the earlier audits found.
+The station runs two YOLO26 models, one RGB and one thermal, and fuses their boxes late. The design is in [SPEC.md](../../SPEC.md#detection). This file covers the data each model trains and is tested on, how to convert and train, the laptop test, which data to add next and, at the bottom, what the training runs found.
 
 ## Training data
 
-All datasets are trained at `imgsz=640`. Datasets with both modalities are split by modality, and each model sees only its own: RGB trains on SARD, NII-CU-MAPD and, from the `heridal` run on, HERIDAL ([why](#heridal)); thermal on RGBTDronePerson, NII-CU-MAPD and HIT-UAV.
+Every dataset is converted to one class, `person`, and trained at `imgsz=640`. Datasets with both modalities are split by modality, and each model sees only its own.
 
-| Dataset | Modality | What it is | License |
+| Dataset | Model | What it is | License |
 | --- | --- | --- | --- |
 | [SARD](https://www.kaggle.com/datasets/nikolasgegenava/sard-search-and-rescue) (Kaggle copy; the [IEEE DataPort original](https://ieee-dataport.org/documents/search-and-rescue-image-dataset-person-detection-sard) needs a paid subscription) | RGB | Actors in search-and-rescue poses, including lying | Not stated |
-| [NII-CU-MAPD](https://www.nii-cu-multispectral.org/) | RGB + thermal | 5,880 aligned pairs, drone at 20 to 50 m over a baseball field, Chiba, Japan, January 2020 | CC BY-NC-SA 3.0 |
-| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal (RGB labels misaligned) | 6,125 pairs of tiny persons: streets, campuses, parks, piers; day and night, top-down and oblique | Not verified |
-| [HIT-UAV](https://zenodo.org/record/7633134) | Thermal | 2,898 images at 640×512, 60 to 130 m, campus and roads, day and night | CC0 (Zenodo; GitHub says CC BY 4.0) |
+| [NII-CU-MAPD](https://www.nii-cu-multispectral.org/) | RGB and thermal | 5,880 aligned pairs from a drone at 20 to 50 m over a baseball field in Chiba, Japan, January 2020 | CC BY-NC-SA 3.0 |
+| [HERIDAL](https://universe.roboflow.com/drone-internship/heridal-human-detection) (Roboflow export v4) | RGB | Real SAR exercises in Croatian karst, forest, maquis, snow and a city park; volunteers stand, walk, sit and lie | CC BY 4.0 |
+| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal | 6,125 pairs of tiny people in streets, campuses, parks and piers, day and night, top-down and oblique | Not verified |
+| [HIT-UAV](https://zenodo.org/record/7633134) | Thermal | 2,898 images at 640×512 from 60 to 130 m over a campus and roads, day and night | CC0 on Zenodo; GitHub says CC BY 4.0 |
 
 ### SARD
 
-The copy we have is the Roboflow export `sard-8xjhy` v17 "TILES_3x3": each source photo is cut into a 3×3 grid and every tile stretched to 640×640. One class, `human`; the pose classes of the original are not in it. No augmentation.
+Our copy is the Roboflow export `sard-8xjhy` v17 "TILES_3x3". Each source photo is cut into a 3×3 grid and every tile is stretched to 640×640, which makes people about 3× larger than in the full photo and changes their aspect ratio. It has one class, `human`; the original's pose classes are gone. The splits are by source photo, so no photo has tiles in two splits.
 
 | | Train | Valid | Test |
 | --- | --- | --- | --- |
@@ -24,18 +25,30 @@ The copy we have is the Roboflow export `sard-8xjhy` v17 "TILES_3x3": each sourc
 | Persons | 5,229 | 1,463 | 732 |
 | Tiles with no person | 571 | 177 | 84 |
 
-The splits are by source photo: no photo has tiles in two splits. Tiling makes people about 3× larger than in the full photo, and the stretch changes their aspect ratio.
-
 ### NII-CU-MAPD
 
-The zip (9.1 GB) has two variants:
+We train on the `4-channel` variant, the authors' cleaned subset. It keeps only boxes visible in both modalities, drops motion-blurred frames and crops thermal to the RGB field of view, so the normalised boxes fit both images. Train has 2,653 images and 10,144 boxes, val 485 images and 891 boxes.
 
-- `4-channel` is the authors' cleaned subset. It keeps only boxes visible in both modalities, drops motion-blurred frames and crops thermal to the RGB field of view, so the normalised box coordinates are the same for both. Train: 2,653 images, 10,144 boxes, 55 with no person. Val: 485 images, 891 boxes, 71 with no person.
-- `rgb-t` has all 5,880 pairs and about 35% more boxes (19,764 in train). Boxes seen in only one modality are marked with a `type` field, and thermal has black margins that need cropping. Worth it if we need more real data.
+Native size is RGB 2706×1980 and thermal 701×513. At `imgsz=640` the RGB frame shrinks about 4×, so its people end up 8 to 15 px, about the drone's size. The other variant, `rgb-t`, has all 5,880 pairs and about 35% more boxes, but it's the same field.
 
-Native size is RGB 2706×1980 and thermal 701×513. At `imgsz=640` the RGB image shrinks about 4×, and its people with it. If RGB recall is poor on small people, train or run inference on tiles instead.
+### HERIDAL
 
-We train on `4-channel`.
+The Roboflow export has 1,579 frames and 3,073 people, every frame stretch-resized from 4:3 to 640×640. People are tiny: median 11 px, 90% under 16 px. Roboflow's own split leaks (44 of its 101 test frames have a near-identical frame in train or valid), so `convert.py heridal` ignores it and does the following:
+
+- Resizes every frame back to 853×640. The stretch made people 25% narrower than they are. Boxes keep their normalised coordinates.
+- Splits by location code (the filename prefix), so val and test show places the model never trained on. MOB and GRO are the same scenes as BLA and GOR and stay with them.
+- Groups frames that show the same ground (difference hash, Hamming distance 40 or less): 304 of the 1,579 frames repeat another view. Val and test keep one frame per view, and none of their views appears in train.
+- Cuts train and val frames into two overlapping 640×640 crops, so people keep their native 8 to 16 px at `imgsz=640`. A box goes to a crop when at least half of it is inside. Test frames stay whole and are scored tiled, the way the drone's RGB will run.
+
+| Split | Locations | Scenes | Images | Persons | Empty |
+| --- | --- | --- | --- | --- | --- |
+| train | VRD, GOR, GRO, JAS, BRK, ZRI, TRS, BLA, MOB | karst, snow, pasture, pine and deciduous canopy, city park | 2,180 crops of 1,090 frames | 2,262 (3,805 boxes over both crops; 57% in the ZRI park) | 907 crops |
+| val | RAK, BRS | karst grassland, dark sparse woodland | 238 crops | 174 boxes | 117 crops |
+| test | MED, BRA, CAP, SB, BLI, CAB | maquis, dark pine forest, riverbank, autumn forest, meadow, ravine | 303 frames | 582 | 105 |
+
+The test locations hold scene types that train lacks. HERIDAL val is small next to SARD and NII-CU-MAPD val, so it has little say in which epoch becomes `best.pt`.
+
+The 8.3 GB [Zenodo original](https://zenodo.org/records/5662351) (about 4000×3000, CC BY 3.0) has about 29× more pixels per person and no stretch or re-compression. We don't need it at the drone's scale yet, but it would allow scale augmentation from sharp frames.
 
 ### RGBTDronePerson
 
@@ -47,39 +60,33 @@ We train on `4-channel`.
 | crowd | 7,172 | 2,004 |
 | uncertain | 1,340 | 106 |
 
-Both modalities are 640×512. People are tiny: median side √(w·h) about 11 px, p95 about 17 px, and crowd boxes (a few people too close to separate) have a median of 14 px.
+Both modalities are 640×512. People have a median size of about 11 px, p95 about 17 px.
 
-- The labels are drawn on the thermal image. RGB is only weakly aligned: the person is often 10 to 30 px from its box, more than the person's own size. A per-frame shift can't fix it, because phase correlation finds a confident shift on only about 3% of frames, and neighbouring frames disagree by 3 to 12 px. About 35% of RGB frames are night shots where nobody is visible. The thermal labels are exact; the RGB labels are not usable for an RGB-only model. If the RGB model was trained on this set, retrain it without it.
-- person, rider and crowd are all people and collapse to `person`. `uncertain` is neither a person nor background, so mask those regions rather than dropping them as negatives.
-- Three train XMLs (`00065`, `00067`, `00076`) say 630×500 for 640×512 images. Take the size from the image; the boxes fit as drawn.
-- Thermal JPGs are three identical grey channels.
-- The authors' train/val split comes from videos, and about 5% of val frames have a near-identical train frame.
-- Training uses the thermal images only. Checked by drawing the labels on both modalities: on RGB, boxes sit beside the person, cover nobody, or fall on night frames where nobody is visible. An earlier RGB model trained with them scored AP50 0.06 on this val set.
-- Augmentation worth trying: a smaller `scale` (0.2 to 0.3 instead of 0.5, which can shrink an 11 px person to 5 px) and `flipud=0.5`, since most views are top-down.
+- Thermal only. The labels are drawn on the thermal image, and on RGB the person is often 10 to 30 px from its box, more than the person's own size. No per-frame shift fixes it, and about 35% of RGB frames are night shots where nobody is visible. An RGB model trained with these labels scored AP50 0.06 on them.
+- person, rider and crowd all become `person`. `uncertain` regions are filled grey, since they are neither a person nor background.
+- Three train XMLs (`00065`, `00067`, `00076`) say 630×500 for 640×512 images, so the size comes from the image.
+- The authors split by video, and about 5% of val frames have a near-identical train frame.
 
 ### HIT-UAV
 
-Thermal, 640×512, with classes Person, Car, Bicycle, OtherVehicle and DontCare. Only Person is kept; the 148 DontCare boxes become background.
+Thermal, 640×512, with classes Person, Car, Bicycle, OtherVehicle and DontCare. Only Person is kept, and the 148 DontCare boxes become background.
 
 | | Train | Val | Test |
 | --- | --- | --- | --- |
 | Images | 2,008 | 287 | 571 |
 | Persons | 8,533 | 1,168 | 2,611 |
 
-42% of images have no person, the only good source of thermal negatives we train on. Its scores are optimistic: 31% of val/test images are near-duplicates of train ([leakage](#leakage-and-synthetic-artefacts)). Daytime people barely stand out ([thermal](#thermal)).
+42% of its images have no person, our main source of thermal negatives. Its own scores are optimistic: the 2,898 images come from video and were split per frame, so 31% of val/test images are near-duplicates of train.
 
 ## Test data
 
-WiSARD and HERIDAL are the real-SAR tests. Both RGB models scored about 0 on HERIDAL ([below](#heridal)), so from the `heridal` run on, RGB also trains on HERIDAL, split by location code: six locations stay out of training as the test. WiSARD stays fully held out. The target score gets set from these results ([TODO.md](../../TODO.md#research)).
+The RGB test that counts is HERIDAL's six held-out locations, above. Thermal has no held-out test yet; its scores come from the training sets' own splits, which share flights with train.
 
-- WiSARD sample: one synchronised flight, `210417_MtErie_Enterprise` (Mt Erie, Washington, 17 April 2021). 264 frames of the same four volunteers on forest and rocky clearing in daylight, RGB 3840×2160 and thermal 640×512, 1,022 and 1,006 persons. The full set is 40.5 GB with 15,453 synced pairs.
-- HERIDAL: real SAR in Croatian karst, maquis, pine forest, ravines, snow and one city park; volunteers stand, walk, sit and lie. We have the Roboflow export ["Heridal Human Detection" v4](https://universe.roboflow.com/drone-internship/heridal-human-detection) (167 MB, CC BY 4.0), which stretch-resized every frame to 640×640. The 8.3 GB [Zenodo original](https://zenodo.org/records/5662351) (about 4000×3000, CC BY 3.0) would carry about 29× more pixels per person. In the export, all 3,073 boxes use category id 1; map everything to `person`.
-
-Both need care. HERIDAL's shipped split leaks: 44 of its 101 test images have a near-identical frame in train or valid, and its test split has no empty images. `convert.py` ignores it and splits by location instead ([below](#heridal)). WiSARD is one site and four actors, so read it as a sanity check, not a benchmark.
+WiSARD (real wilderness SAR, RGB and thermal) is out of scope for now. We had a 264-frame sample of one flight and four volunteers, which is too narrow for more than a sanity check.
 
 ## Conversion and training
 
-Raw datasets go in `data/raw/`, unpacked as downloaded. Each is converted to single-class `person` YOLO under `data/yolo/`, with images symlinked to `data/raw/`:
+Raw datasets go in `data/raw/`, unpacked as downloaded. Each is converted to single-class `person` YOLO under `data/yolo/`, with images symlinked to `data/raw/` (HERIDAL's resized frames and crops, and RGBTDronePerson's masked frames, are written out instead):
 
 ```
 R=data/raw/sard; python src/detection/prepare.py sard --person-ids 0 --split train=$R/train/images:$R/train/labels --split val=$R/valid/images:$R/valid/labels --split test=$R/test/images:$R/test/labels
@@ -89,369 +96,70 @@ python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson
 python src/detection/convert.py heridal data/raw/heridal
 ```
 
-Then train both models and score them on every val and test split:
+Train under a memory cap; caching images in RAM once ran the 30 GB lab computer out of memory, so `train.py` doesn't cache:
 
 ```
-python src/detection/train.py rgb thermal --epochs 100
+systemd-inhibit --what=sleep:idle --why=train systemd-run --user --scope -p MemoryMax=18G -p MemorySwapMax=0 .venv/bin/python src/detection/train.py rgb --model yolo26n.pt --epochs 60 --tag heridal
 ```
 
-`--tag NAME` appends to the run folder name (`runs/rgb/yolo26n_e60_heridal`), for runs that differ in data rather than model or epochs.
-
-Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopping, batch 32, seed 0, no image cache (caching in RAM ran the 30 GB lab computer out of memory), Ultralytics' default augmentation. Each model's val set is all its datasets' val splits together, and that picks `best.pt`. Lab computer: RTX 5080 (16 GB), about 35 s per RGB epoch. An interrupted run resumes when the same command is run again.
-
-## Results
-
-| Model | Modality | Own val | WiSARD | HERIDAL |
-| --- | --- | --- | --- | --- |
-| Model | Modality | Own val | WiSARD | HERIDAL test locations, tiled |
-| --- | --- | --- | --- | --- |
-| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | Later | AP50 0.015, recall 0.02 ([below](#heridal)) |
-| YOLO26n | Thermal | AP50 0.650, recall 0.62 ([below](#yolo26n-thermal)) | Later | n/a (RGB only) |
-| YOLO26s | RGB | AP50 0.889, recall 0.85 ([below](#yolo26s-against-yolo26n)) | Later | AP50 0.009, recall 0.03 ([below](#heridal)) |
-| YOLO26s | Thermal | AP50 0.666, recall 0.64 ([below](#yolo26s-against-yolo26n)) | Later | n/a |
-| YOLO26n + HERIDAL | RGB | Training ([below](#yolo26n-rgb-with-heridal)) | Later | Training |
-
-WiSARD is out of scope for now. Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling.
-
-Each run has its own folder, `runs/<rgb|thermal>/<model>_e<epochs>[_<tag>]/`. Its `results.md` puts everything on one page: setup, the val curve and the epoch `best.pt` came from, `scores.md`, every `eval_sizes.py` result in `eval/`, and the plots (training curves, precision-recall and F1 curves, confusion matrix, label statistics, one val batch with labels and predictions). `train.py` and `eval_sizes.py` rewrite it when they finish; `python src/detection/report.py --all` rewrites every run's. Weights (`weights/best.pt`) stay on the lab computer, git-ignored.
-
-| Run | Data | results.md |
-| --- | --- | --- |
-| YOLO26n RGB, 100 epochs | SARD, NII-CU-MAPD | [runs/rgb/yolo26n_e100](../../runs/rgb/yolo26n_e100/results.md) |
-| YOLO26s RGB, 70 epochs | SARD, NII-CU-MAPD | [runs/rgb/yolo26s_e70](../../runs/rgb/yolo26s_e70/results.md) |
-| YOLO26n RGB + HERIDAL, 60 epochs | SARD, NII-CU-MAPD, HERIDAL train locations | `runs/rgb/yolo26n_e60_heridal` (training) |
-| YOLO26n thermal, 100 epochs | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | [runs/thermal/yolo26n_e100](../../runs/thermal/yolo26n_e100/results.md) |
-| YOLO26s thermal, 50 epochs | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | [runs/thermal/yolo26s_e50](../../runs/thermal/yolo26s_e50/results.md) |
-
-### Reading the metrics
-
-Every metric compares the model's boxes with the hand-drawn ones. A detection is correct when its box overlaps a labelled person enough, and there are two settings behind that:
-
-- **IoU** (intersection over union): the overlap area of the predicted and the labelled box, divided by the area they cover together. 1 is identical, 0 is no overlap.
-- **Confidence**: the model's score from 0 to 1 for each box. A threshold keeps only boxes above it; `detect.py` uses 0.25. Lowering it finds more people and raises more false alarms.
-
-| Metric | What it measures | How to read it | How much it matters here |
-| --- | --- | --- | --- |
-| Recall (R) | Share of the labelled people the model found. | 0.80 means 1 person in 5 is missed. | Most important. A missed person is a missed victim. |
-| Precision (P) | Share of the model's boxes that are real people. | 0.90 means 1 box in 10 is a false alarm. | Less important. The operator checks every detection, and a false alarm costs seconds. |
-| AP50 | Average precision with a box counted as correct at IoU 0.5 or more: the area under the precision-recall curve as the threshold sweeps from strict to loose. One number that rewards finding people with few false alarms at every threshold. With one class it equals mAP50. | Compare models and datasets with it. | The main number for comparing models. |
-| AP50-95 | The same, averaged over ten IoU levels, 0.50, 0.55, up to 0.95. It rewards tightly fitting boxes. | A tighter-box score, always below AP50. | Secondary: only a check on box quality. |
-| Recall by size | Recall for people in size bins (√(box area) in pixels at the model input). | The row for about 10 px is the one that tells how the drone will do. | High. Our people are 10 to 15 px, and the overall numbers hide how recall falls with size. |
-
-How the numbers in this file were made:
-
-- `scores.md` comes from ultralytics. Its P and R are taken at the confidence that gives the best balance of the two (maximum F1), not at 0.25.
-- "Recall at conf 0.25" and "recall by size" come from `eval_sizes.py`, so they match what `detect.py` will output. Its AP50 is its own implementation and differs from ultralytics' in the third decimal.
-- So the two recall figures differ a little: SARD val is 0.908 in `scores.md` and 0.934 at conf 0.25. Neither is wrong; they use different thresholds.
-
-**Why AP50-95 is much lower than AP50 here.** At small sizes a tiny shift breaks the IoU. For a 10 px person, a box shifted by 1 px on both axes has IoU 0.68, and by 2 px 0.47, which already fails the 0.5 level. For a 50 px person the same 2 px shift still has IoU 0.85. Reaching IoU 0.9 on a 10 px person needs an error under half a pixel, which is finer than hand-labelling and the model can be. Labelling style adds to it: boxes vary in how tight they are, and RGBTDronePerson's `crowd` boxes cover several people.
-
-The gap follows the person size:
-
-| Dataset | Typical person | AP50 | AP50-95 | AP50-95 ÷ AP50 |
-| --- | --- | --- | --- | --- |
-| SARD (RGB) | about 50 px | 0.952 | 0.644 | 0.68 |
-| NII-CU-MAPD thermal | 12 to 24 px | 0.986 | 0.631 | 0.64 |
-| RGBTDronePerson thermal | about 11 px | 0.584 | 0.197 | 0.34 |
-
-A low AP50-95 therefore doesn't mean the detector is bad. A 2 px box error on a 10 px person is about a fifth of the person's height, which doesn't change where the operator looks. Judge the models by recall and AP50, and watch AP50-95 only to see whether a change made the boxes looser.
-
-Rough guide for this project, not a standard: AP50 above 0.9 is strong, 0.7 to 0.9 usable, below 0.5 poor. Recall for 10 px people matters most, and the target score gets set from the held-out tests ([TODO.md](../../TODO.md#research)).
-
-### YOLO26n RGB
-
-Trained 100 epochs on SARD + NII-CU-MAPD RGB (6,694 images), about 35 s an epoch on the RTX 5080. `best.pt` is from epoch 68; val AP50 levelled off around epoch 50 and AP50-95 kept rising slightly to the end. AP50, AP50-95, P and R from `train.py` (ultralytics validation); recall at conf 0.25 and by size from `eval_sizes.py`, imgsz 640, no tiling.
-
-| Data | Split | AP50 | AP50-95 | Precision | Recall | Recall at conf 0.25 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Both val sets | val | 0.907 | 0.550 | 0.948 | 0.854 | |
-| SARD | val | 0.952 | 0.644 | 0.971 | 0.908 | 0.934 |
-| SARD | test | 0.945 | 0.644 | 0.962 | 0.902 | 0.932 |
-| NII-CU-MAPD RGB | val | 0.834 | 0.379 | 0.898 | 0.774 | 0.780 |
-
-Recall by person size at the model input (native size × 640 / long side), conf 0.25:
-
-| Data | Under 16 px | 16 to 24 px | 24 to 32 px | Over 32 px |
-| --- | --- | --- | --- | --- |
-| NII-CU-MAPD RGB val (shrunk 4.2×) | 0.80 (424 people, 8 to 15 px) | 0.77 (467 people, over 15 px) | | |
-| SARD val | 0.00 (16 people) | 0.50 (46) | 0.84 (146) | 0.97 (1,255) |
-| SARD test | 0.13 (8 people) | 0.64 (28) | 0.84 (80) | 0.97 (616) |
-
-- NII-CU-MAPD is the only set with people at the drone's size (about 10 px). Recall there is about 0.8 at 8 to 15 px, so the drone's RGB tiles should work, if the scenes transfer.
-- SARD's people are mostly over 32 px, so its 0.95 says little about the drone. Below 24 px it misses half or more, on few examples. It fits the robot's close-range view.
-- These are the training datasets' own splits, from the same flights as train. The held-out WiSARD and HERIDAL scores are the real test.
-- Everything for this run, plots included: [runs/rgb/yolo26n_e100/results.md](../../runs/rgb/yolo26n_e100/results.md).
-
-### YOLO26n thermal
-
-Trained 100 epochs on RGBTDronePerson + NII-CU-MAPD + HIT-UAV thermal (9,561 images). `best.pt` is from epoch 28 (val AP50 0.647); after that val AP50 slowly fell to 0.605 at epoch 100 while training loss kept dropping, so the model overfits after about epoch 30. Next run: 30 to 50 epochs, or early stopping. Same measures as RGB; thermal images are 640 px wide, so native size is the size at the model input.
-
-| Data | Split | AP50 | AP50-95 | Precision | Recall | Recall at conf 0.25 |
-| --- | --- | --- | --- | --- | --- | --- |
-| All three val sets | val | 0.650 | 0.257 | 0.703 | 0.623 | |
-| RGBTDronePerson | val | 0.584 | 0.197 | 0.655 | 0.594 | 0.583 |
-| NII-CU-MAPD thermal | val | 0.986 | 0.631 | 0.980 | 0.957 | 0.971 |
-| HIT-UAV | val | 0.911 | 0.492 | 0.901 | 0.857 | 0.898 |
-| HIT-UAV | test | 0.921 | 0.493 | 0.893 | 0.864 | 0.905 |
-
-Recall by person size, conf 0.25:
-
-| Data | Under 8 px | 8 to 12 px | 12 to 16 px | 16 to 24 px | Over 24 px |
-| --- | --- | --- | --- | --- | --- |
-| RGBTDronePerson val | 0.32 (501) | 0.60 (7,850) | 0.64 (4,581) | 0.45 (1,406) | 0.39 (122) |
-| NII-CU-MAPD thermal val | | 0.67 (36) | 0.97 (335) | 0.99 (413) | 1.00 (107) |
-| HIT-UAV val | 0.60 (5) | 0.84 (230) | 0.91 (476) | 0.94 (398) | 0.83 (59) |
-| HIT-UAV test | 0.75 (16) | 0.88 (548) | 0.91 (1,045) | 0.92 (858) | 0.89 (144) |
-
-- At the drone's size, about 10 px, recall is 0.84 to 0.88 on HIT-UAV and 0.60 on RGBTDronePerson.
-- RGBTDronePerson is the hard set and pulls the combined score down: tiny people in dense street scenes, day and night. Its recall drops for boxes over 16 px, likely because those are mostly `crowd` boxes (several people in one box), which are hard to match at IoU 0.5.
-- NII-CU-MAPD (0.986) is nearly solved: one field, people standing apart in the open.
-- HIT-UAV scores are optimistic: 31% of its val/test images are near-duplicates of train.
-- As for RGB, these are the training datasets' own splits. The held-out WiSARD thermal score is the real test; an earlier HIT-UAV-only model scored 0.87 on HIT-UAV test and 0.01 on WiSARD.
-- Everything for this run, plots included: [runs/thermal/yolo26n_e100/results.md](../../runs/thermal/yolo26n_e100/results.md).
-
-### YOLO26s against YOLO26n
-
-Same data and settings as nano, with `--model yolo26s.pt`. Fewer epochs, since nano had stopped improving: RGB 70 (`best.pt` from epoch 55), thermal 50 (`best.pt` from epoch 28, the same epoch as nano). Speed isn't compared here: on the RTX 5080 `eval_sizes.py`'s ms per image is mostly image loading. The [laptop test](#test-on-the-station-laptop) measures it.
-
-| Data | Split | AP50 n | AP50 s | Recall at conf 0.25 n | Recall at conf 0.25 s |
-| --- | --- | --- | --- | --- | --- |
-| RGB, both val sets | val | 0.907 | 0.889 | | |
-| SARD | val | 0.952 | 0.948 | 0.934 | 0.925 |
-| SARD | test | 0.945 | 0.946 | 0.932 | 0.922 |
-| NII-CU-MAPD RGB | val | 0.834 | 0.788 | 0.780 | 0.771 |
-| Thermal, all three val sets | val | 0.650 | 0.666 | | |
-| RGBTDronePerson | val | 0.584 | 0.602 | 0.583 | 0.616 |
-| NII-CU-MAPD thermal | val | 0.986 | 0.977 | 0.971 | 0.962 |
-| HIT-UAV | val | 0.911 | 0.914 | 0.898 | 0.879 |
-| HIT-UAV | test | 0.921 | 0.934 | 0.905 | 0.905 |
-
-AP50 from `scores.md` (ultralytics), recall from `eval_sizes.py` at imgsz 640.
-
-- RGB: small is no better, and is worse on NII-CU-MAPD, the set with drone-sized people.
-- Thermal: small gains about 1.5 AP50 overall, all of it on RGBTDronePerson (recall 0.58 to 0.62, mostly at 8 to 16 px). On the other sets the two are within noise.
-- Both thermal models peak at epoch 28, and a model with 3× the parameters barely helps, so the limit is the training data, not the model size. Nano stays the default; the held-out [HERIDAL](#heridal) result agrees.
-- Everything per run, plots included: [RGB](../../runs/rgb/yolo26s_e70/results.md), [thermal](../../runs/thermal/yolo26s_e50/results.md).
-
-### HERIDAL
-
-RGB only. Both RGB models trained without HERIDAL fail on it, which is why RGB now trains on part of it.
-
-`convert.py heridal` cleans the Roboflow export:
-
-- Un-stretch: Roboflow squashed the 4:3 frames to 640×640, which makes people 25% narrower than they are, so every frame is resized back to 853×640.
-- Split by location code, not by frame, since Roboflow's split leaks. Frames are also grouped by near-duplicate view (difference hash; 304 of the 1,579 frames repeat another view). Val and test keep one frame per view, and none of their views appears in train.
-- Train and val are cut into two overlapping 640×640 crops, so people keep their native 8 to 16 px at `imgsz=640`. A box goes to a crop if at least half of it is inside. Test frames stay whole and are scored tiled, as the drone will run.
-
-| Split | Locations | Scenes | Images | Persons | Empty |
-| --- | --- | --- | --- | --- | --- |
-| train | VRD, GOR, GRO, JAS, BRK, ZRI, TRS, BLA, MOB | karst, snow, pasture, pine and deciduous canopy, city park | 2,180 crops of 1,090 frames | 3,805 boxes (2,262 persons; 57% in the ZRI park) | 907 crops |
-| val | RAK, BRS | karst grassland, dark sparse woodland | 238 crops | 174 boxes | 117 crops |
-| test | MED, BRA, CAP, SB, BLI, CAB | maquis, dark pine forest, riverbank, autumn forest, meadow, ravine | 303 frames | 582 | 105 |
-
-MOB and GRO are the same scenes as BLA and GOR, so they stay with them in train. The test locations hold scene types train lacks. HERIDAL val is small next to SARD and NII-CU-MAPD val, so it has little say in which epoch becomes `best.pt`.
-
-Models trained without HERIDAL, on its test locations, tiled 640 (`eval_sizes.py --imgsz 640 --tile 640`):
-
-| Model | AP50 | AP50 untiled | Recall at conf 0.25 | Precision at conf 0.25 | Recall 8 to 16 px | Recall 16 to 24 px |
-| --- | --- | --- | --- | --- | --- | --- |
-| YOLO26n | 0.015 | 0.011 | 0.024 | 0.19 | 0.00 (405) | 0.08 (119) |
-| YOLO26s | 0.009 | 0.006 | 0.026 | 0.10 | 0.01 (405) | 0.07 (119) |
-
-- About 97% of people are missed, and at 8 to 16 px, the drone's size, nearly all. Most of the few boxes are false alarms. All 1,275 distinct views gave the same picture (AP50 0.007 nano, 0.012 small, `eval/heridal-v1-*.json`).
-- It isn't the conversion or the box style. The labels sit on the people (checked by drawing them), the models skip people who are plainly visible on open grass, and at IoU 0.25 nano still has recall 0.03.
-- Same pattern as the earlier thermal audit ([below](#models-dont-transfer-between-datasets)): high scores on the training sets' own splits, near zero on a new site. SARD's people are mostly over 32 px, and NII-CU-MAPD's small people are all on one baseball field in winter. Neither has people in natural terrain at 10 px.
-- Raw output: `runs/rgb/{yolo26n_e100,yolo26s_e70}/eval/heridal-test.json`.
-
-### YOLO26n RGB with HERIDAL
-
-Training now: YOLO26n, 60 epochs, on SARD, NII-CU-MAPD and the HERIDAL train locations; HERIDAL val joins the combined val set. Started 2026-10-30 with
+`train.py` trains one model per modality on all its datasets, scores `best.pt` on every val and test split into `scores.md`, and writes `results.md`. `--tag` is added to the run folder name for runs that differ in data. A run that gets interrupted resumes when the same command runs again. Then score the held-out test tiled:
 
 ```
-systemd-inhibit --what=sleep:idle --why="YOLO26n RGB + HERIDAL" systemd-run --user --scope -p MemoryMax=18G -p MemorySwapMax=0 bash -c '.venv/bin/python src/detection/train.py rgb --model yolo26n.pt --epochs 60 --tag heridal && .venv/bin/python src/detection/eval_sizes.py runs/rgb/yolo26n_e60_heridal/weights/best.pt heridal test --imgsz 640 --tile 640 --device 0 --out runs/rgb/yolo26n_e60_heridal/eval/heridal-test.json' 2>&1 | tee runs/train_yolo26n_heridal.log
+python src/detection/eval_sizes.py runs/rgb/RUN/weights/best.pt heridal test --imgsz 640 --tile 640 --device 0 --out runs/rgb/RUN/eval/heridal-test.json
 ```
 
-What decides it, all in `runs/rgb/yolo26n_e60_heridal/results.md` when it finishes:
-
-- HERIDAL test locations, tiled: AP50 and recall at 8 to 16 px against 0.015 and 0.00 for the model without HERIDAL ([above](#heridal)).
-- SARD and NII-CU-MAPD val in `scores.md` should stay near 0.95 and 0.83 AP50. A drop means HERIDAL's tiny people pull the model away from the larger ones.
-
-Its combined val set now includes HERIDAL, so its "all val" AP50 isn't comparable with the earlier RGB runs.
+Settings: YOLO26 from COCO weights, `imgsz=640`, batch 32, seed 0, no early stopping, Ultralytics' default augmentation. Each model's val set is all its datasets' val splits together, and that picks `best.pt` (mostly by AP50-95). The lab computer has an RTX 5080 (16 GB); an RGB epoch takes about 25 s.
 
 ## Test on the station laptop
 
 Nano first, then small.
 
 1. Latency per frame for each model alone: thermal at 640×512, and RGB at 1280×1024 tiled into six 640 crops.
-2. Both models running at the same time on all four streams (drone thermal 30 FPS, drone RGB 10 FPS, robot thermal and RGB 5 FPS each), which is the real load.
-3. Sustained rate over at least 10 minutes. A laptop without a fan throttles, so the first minute overstates it.
+2. Both models at once on all four streams (drone thermal 30 FPS, drone RGB 10 FPS, robot thermal and RGB 5 FPS each), which is the real load.
+3. Sustained rate over at least 10 minutes, since a laptop without a fan throttles and the first minute overstates it.
 4. Memory use with both models loaded.
 5. PyTorch on the GPU against an exported model (`yolo export`, in the laptop's native format).
 
 These numbers replace the predicted frame rates in [SPEC.md](../../SPEC.md#streams) and [communication/](../communication/).
 
-## If we need more data
-
-Only if the held-out scores fall short. In order:
-
-1. C2A (RGB, MIT, 10,215 synthetic images: people pasted onto AIDER disaster photos of rubble, fire and flood, 19% lying). Re-split before use: each AIDER photo appears five times (`<disaster>_imageNNNN_<0-4>`), and the authors' split puts 98% of val/test photos in train too. Keep all five variants in one split, 60/20/20 within each disaster type. About a quarter of people stay under 8 px even at 640, and no image is empty, so negatives have to come from another set.
-2. AIResQ (thermal, real SAR, 9,788 images). Full set on request.
-3. NOMAD (RGB, real, 100 actors walking, lying and hiding at 10 to 90 m, 42,825 frames). License unclear.
-4. NII-CU-MAPD's `rgb-t` variant, for about 35% more boxes.
-5. BIRDSAI (thermal, savanna, mostly night, CDLA-Permissive) as a thermal backup, and VisDrone for generic pretraining.
-
-No dataset we know of has real people in real rubble. Our own staged clips would fill that: actors lying on rubble or a construction site, day and night, 20 to 60 m, both cameras. Even 200 to 500 labelled frames would be the most valuable test set we could have.
-
-### All candidates
-
-"?" means not verified from the source page. Licenses marked "?" must be confirmed with the authors before anything trained on them is published.
-
-| Name | Modality | Disaster-relevant | License | Size | Link | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| SARD (2021) | RGB | Yes: actors, pose classes incl. lying | Not stated | 4.4 GB | [Kaggle](https://www.kaggle.com/datasets/nikolasgegenava/sard-search-and-rescue) | Training (RGB) |
-| NII-CU-MAPD | RGB + thermal | No: baseball field, 20 to 50 m | CC BY-NC-SA 3.0 | 9.1 GB | [project](https://www.nii-cu-multispectral.org/) | Training (RGB, thermal) |
-| RGBTDronePerson (2023) | RGB + thermal | No: tiny persons, day + night | ? | 1.9 GB | [project](https://nnnnerd.github.io/RGBTDronePerson/) | Training (thermal; RGB labels misaligned) |
-| WiSARD (2022) | RGB + thermal | Partly: real wilderness SAR, day/night | Permissive notice, not a named license | 40.5 GB (sample 0.97 GB) | [project](https://sites.google.com/uw.edu/wisard/) | Test (sample) |
-| HERIDAL (2019) | RGB | Partly: real SAR, wilderness, lying/hidden people | CC BY 3.0 (Zenodo) / CC BY 4.0 (Roboflow) | 8.3 GB (export 167 MB) | [Zenodo 5662351](https://zenodo.org/records/5662351) | Test (Roboflow export) |
-| HIT-UAV (2023) | Thermal | No: campus/roads, 60 to 130 m | CC0 (Zenodo API; GitHub says CC BY 4.0) | 815 MB | [Zenodo 7633134](https://zenodo.org/record/7633134) | Training (thermal) |
-| C2A (2024) | RGB | Yes: synthetic people on AIDER disaster scenes | MIT (Kaggle page) | 4.9 GB | [GitHub](https://github.com/Ragib-Amin-Nihal/C2A), [Kaggle](https://www.kaggle.com/datasets/rgbnihal/c2a-dataset) | Analysed; next RGB set, after re-split |
-| AIResQ (2025) | Thermal | Yes: SAR, 9,788 images | ? | ? | [Nature Sci. Data](https://www.nature.com/articles/s41597-026-07663-9) | Candidate; full set on request |
-| NOMAD (2024) | RGB | Partly: real, 100 actors, 10 to 90 m, 42,825 frames | ? | ? | [GitHub](https://github.com/ArtRuss/NOMAD) | Candidate; license and size unknown |
-| BIRDSAI (2020) | Thermal | No: savanna anti-poaching, mostly night | CDLA-Permissive | 3.7 GB real | [LILA](https://lila.science/datasets/conservationdrones/) | Candidate: thermal backup |
-| VisDrone-DET (2018) | RGB | No: urban crowds | Academic use ? | 1.8 GB | [GitHub](https://github.com/VisDrone/VisDrone-Dataset) | Candidate: generic pretraining |
-| TinyPerson (2020) | RGB | No: beach/sea, under 20 px | ? | ? | [GitHub](https://github.com/ucas-vg/PointTinyBenchmark) | Candidate |
-| Okutama-Action (2017) | RGB video | No: actions on a field | Non-commercial ? | ? | [GitHub](https://github.com/miquelmarti/Okutama-Action) | Rejected: action labels, not SAR |
-| AIDER (2019) | RGB | Yes | ? | ? | Zenodo 3888300 | Rejected: image-level labels only (used inside C2A) |
-| DroneVehicle | RGB + IR | No | ? | ? | | Rejected: no person class |
-| LLVIP (2021) | RGB + IR | No | ? | ? | [GitHub](https://github.com/bupt-ai-cz/LLVIP) | Rejected: street cameras, not aerial |
-| Caltech Aerial RGB-T (2024) | RGB + thermal | No | ? | ? | [GitHub](https://github.com/aerorobotics/caltech-aerial-rgbt-dataset) | Rejected: segmentation only |
-
-## What the earlier audits found
-
-Before YOLO26 we audited HIT-UAV, C2A, the WiSARD sample and HERIDAL, with inference only: `best.pt` (YOLO11n trained on HIT-UAV for 14 of 50 planned epochs) and COCO-pretrained `yolo11n.pt`, person class only. The datasets have changed since, but these findings still shape the design.
+## What the data says about the drone
 
 ### Measures
 
-- Person size: √(box w × h) in native pixels. Detectors mostly miss people below about 8 px; 16 to 32 px is workable; above 32 is comfortable.
-- Contrast: (mean grey inside the box − mean grey of a ring one box-size wide around it) ÷ grey std of the whole image. +1 means one std brighter than the ground next to them (warmer, in thermal). |c| < 0.5 counts as low contrast. It is grey level only, so on RGB it is a lower bound: colour often still separates people.
-- Sharpness: variance of the Laplacian, after resizing to a 640 px long side so datasets compare. Under 100 is soft, 100 to 1,000 normal, above 1,000 crisp or heavily textured. It also rises with texture and noise.
-- Crowding: distance from a person's centre to the nearest other centre, in that person's body sizes. Under 1 touch, 1 to 2 a tight group, 2 to 5 a loose group, above 5 isolated.
-- Distinct backgrounds: images grouped by metadata (C2A source photo, HIT-UAV recording clip, WiSARD frame), then merged when their ResNet-50 embeddings are within cosine distance 0.3.
-- Near-duplicate: a 64-bit difference hash within 4 bits of some train image.
-- AP50 and recall: greedy matching at IoU ≥ 0.5, recall at confidence 0.25.
+- Person size: √(box width × height) in pixels. Detectors mostly miss people below about 8 px; 16 to 32 px is workable, and above 32 px is easy.
+- Contrast: (mean grey inside the box − mean grey of a ring one box wide around it) ÷ grey standard deviation of the whole image. +1 means one standard deviation brighter (warmer, in thermal) than the ground next to the person. |c| < 0.5 is low contrast.
+- Sharpness: variance of the Laplacian after resizing to a 640 px long side. Under 100 is soft, above 1,000 crisp or heavily textured.
+- Crowding: distance from a person's centre to the nearest other person's centre, in that person's body sizes. Under 1 they touch, above 5 they're isolated.
 
-### Snapshot
+### Input size and tiling
 
-| | HIT-UAV | C2A | WiSARD IR | WiSARD RGB | HERIDAL |
-| --- | --- | --- | --- | --- | --- |
-| Modality | Thermal, 8-bit grey | RGB, synthetic | Thermal, 8-bit grey | RGB | RGB, real SAR |
-| Images (train / val / test) | 2,029 / 290 / 579 | 6,129 / 2,043 / 2,043 | 264 (eval) | 264 (eval) | 1,258 / 220 / 101 |
-| Persons | 12,312 | 360,467 | 1,006 | 1,022 | 3,073 |
-| Resolution | 640×512 | 123×152 to 5184×3456, median long side 430 | 640×512 | 3840×2160 | 640×640, stretched from 4:3 |
-| Distinct backgrounds | about 20 scenes (264 clips) | 2,043 photos (about 400 scenes) | 1 site | 1 site | about 15 sites, 11 scene types |
-| Images with no person | 41.6% | 0% | 1.1% | 1.1% | 35.5% |
-| Persons per image, median (p95, max) | 2 (16, 33) | 34 (49, 240) | 4 (4, 4) | 4 (4, 4) | 1 (8, 35) |
-| Person px p5 / p50 / p95 | 9.9 / 14.9 / 24.4 | 3.5 / 12.0 / 23.2 | 13.3 / 17.2 / 24.9 | 49.3 / 66.7 / 105.0 | 6.8 / 11.2 / 17.7 |
-| Persons under 8 px (native) | 0.5% | 34.6% | 0% | 0% | 13.6% |
-| Person contrast, p50 | +0.90 | −0.19 | +1.12 | +0.21 | −0.09 |
-| Low-contrast persons | 25.7% | 68.2% | 2.9% | 88.6% | 70.0% |
-| Person sharpness at 640, p50 | 437 | 662 | 3,046 | 4,058 | 3,818 |
-| Persons with a neighbour within 2 sizes | 53.3% | 38.1% | 48.6% | 49.9% | 23.4% |
-| Overlapping another person | 19.4% | 5.1% | 23.0% | 23.1% | 7.5% |
-| Val/test near-duplicates of train | 31% | 72% | n/a | n/a | 44% |
+- Thermal shouldn't be downscaled below about 480 px. A HIT-UAV model scored AP50 0.664 at 320, 0.840 at 480, 0.872 at 640, 0.851 at 960 and 0.754 at 1280 on HIT-UAV test. Recall falls once a person drops to about 6 px at the model input.
+- Running a model above the size it trained at hurts: its 16 to 24 px recall fell from 0.90 at 640 to 0.57 at 1280, because it had never seen people that large.
+- High-resolution RGB has to be tiled. On 4K WiSARD frames, COCO weights scored AP50 0.030 resized to 640 and 0.324 on 640 tiles with 20% overlap.
 
-![Histogram of person sizes in HIT-UAV, C2A, WiSARD thermal and WiSARD RGB](assets/size_compare.png)
-
-Figure 1: how big people are in each dataset. Each line is the share of all labelled people at each size, measured as √(box area) in native pixels. The dashed line is the 8 px floor below which detectors mostly miss people. HIT-UAV and WiSARD thermal sit at 10 to 25 px, C2A has a large share under 8 px, and only WiSARD's 4K RGB has people at a comfortable 50 to 100 px.
-
-### People are tiny objects
-
-![Random person crops from four datasets, at native resolution](assets/person_crops.png)
-
-Figure 2: random people cropped from each dataset at native resolution, with their size in pixels above each crop. Rows: HIT-UAV thermal, C2A synthetic RGB, WiSARD thermal, WiSARD RGB. Most people are 10 to 20 px across and are a light blob at best; C2A's are pasted in at 3 to 22 px whatever the scene. This is what the detector has to find.
-
-- Median 15 to 17 px on thermal, 11 px in HERIDAL RGB. In HERIDAL, people cover 0.11% of a frame on average, 90% are under 16×16 px, and the difficulty is finding a few tiny people in large cluttered scenes rather than separating crowds. Favour recall: a low confidence threshold, small-object heads and tiling.
-- Thermal downscaling floor is about 480 px. On HIT-UAV test: AP50 0.664 at 320, 0.840 at 480, 0.872 at 640, 0.851 at 960, 0.754 at 1280. Recall falls once a person drops to about 6 px at the model input. Keep at least 8 px, ideally 10.
-- Upscaling a model trained at 640 hurts: 16 to 24 px recall drops from 0.90 to 0.57 at 1280, because the model has never seen people that large. Train at the size you run at.
-- On 4K RGB, tiling beats resizing about 10×: AP50 0.030 resized to 640, 0.127 at 1280, 0.132 at 1920, 0.324 with 640 tiles at 20% overlap. Resizing 4K to 640 shrinks a 67 px person to about 11 px. Absolute numbers are low because COCO weights rarely see people from directly above.
-- A P2 (stride-4) head is worth trying where people are under 12 px. RT-DETR-type models are usually weaker under 16 px and slower.
-
-### Models don't transfer between datasets
-
-| Model → data | AP50 | Recall |
-| --- | --- | --- |
-| HIT-UAV model → HIT-UAV test | 0.872 | 0.888 |
-| HIT-UAV model → WiSARD IR | 0.010 | 0.012 |
-| HIT-UAV model → WiSARD IR, IoU ≥ 0.25 | 0.063 | 0.040 |
-| COCO model → HIT-UAV test | 0.099 | 0.035 |
-| COCO model → WiSARD IR | 0.059 | 0.007 |
-
-The thermal model collapsed on WiSARD even though WiSARD people are larger and higher contrast; it only fired tiny low-confidence boxes on hot spots. Likely causes: textured hot rock against flat warm pavement, sharp against soft images (HIT-UAV's median sharpness is 9× lower on the same sensor format, likely camera gain control and JPEG), whole-body against tight boxes, and a partial 14-epoch run. COCO weights cannot detect people in thermal, so a thermal model must be trained on thermal data. Normalising the thermal look (histogram equalisation, blur and sharpen jitter) may help close the gap. This is why held-out tests matter.
-
-### Thermal
+### Thermal by day and night
 
 ![HIT-UAV person size against altitude and camera angle, and day/night contrast](assets/hituav_altitude_daynight.png)
 
-Figure 3: HIT-UAV thermal. Left: person size against flight altitude; the median falls from about 16 px at 60 m to about 11 px at 120 to 130 m. Middle: person size against camera angle (90° is straight down); oblique 30 to 40° views give the smallest people. Right: how much a person stands out from the ground around them, by day and by night. The grey band is low contrast (|c| < 0.5). By day most people fall inside it (median 0.23); at night they stand out (median 1.06). Thermal is much weaker in daylight.
+HIT-UAV thermal. Left: person size against flight altitude, from about 16 px at 60 m to about 11 px at 120 to 130 m. Middle: person size against camera angle (90° is straight down); oblique 30 to 40° views give the smallest people. Right: person contrast by day and by night; the grey band is low contrast.
 
-- HIT-UAV filenames encode `time_altitude_angle_weather_id`. Flag 1 is night (median person contrast 1.06 at night, 0.23 by day): in daytime the ground warms up and people almost vanish. Night is 68% of images and 78% of persons. Weather is always sunny. All 56 altitude × angle combinations (60 to 130 m, 30° to 90°) have at least 18 images.
-- Both thermal sets are 8-bit white-hot JPEGs with no temperature data, so body temperature, which would help triage, can't be learned from them.
-- In WiSARD IR, sunlit rocks reach body temperature, so false positives are a risk. Thermal does not see through concrete or rubble; it helps in darkness and light dust.
-
-### Density and negatives
-
-![Share of images by number of people, per dataset](assets/density_compare.png)
-
-Figure 4: how many people each image holds. HIT-UAV's tallest bar is at 0: 42% of images are empty. Every C2A image has at least about 18 people (median 34). Almost every WiSARD frame shows the same four volunteers.
-
-- HIT-UAV is the most realistic: 42% of images have no person, which teaches the model what background looks like.
-- C2A is a crowd: every image has people, 99% have more than 20. Real earthquake victims are few and scattered, so a model trained only on C2A expects people everywhere and raises false alarms on empty rubble. Add rubble with no people as hard negatives. HERIDAL's 561 empty frames are real hard negatives.
-
-### Leakage and synthetic artefacts
-
-- C2A: each AIDER background is reused five times with different pasted people, spread across splits; 98% of val/test backgrounds appear in train. Re-split by background before trusting any score. People are pasted at an absolute 4 to 24 px whatever the image resolution, so their scale doesn't match the scene: a 4 px person can sit next to a three-storey building. 81% of C2A images are 640 px or smaller, so `imgsz=640` upscales them without adding detail.
-- HIT-UAV: 31% of val/test are near-duplicates of train; the 2,898 images come from 43,470 video frames, split per frame rather than per flight. 148 DontCare boxes in 103 images become background when dropped.
-- HERIDAL: 360 near-duplicate pairs across splits; test-only location codes MOB and GRO are the same sites as BLA and GOR in train. ZRI, an urban park, holds 42% of all persons. Shrubland and snow have no test images. Report per scene type.
-
-![The same C2A photo in train and in test, with different pasted people](assets/c2a_leak_example.png)
-
-Figure 5: a C2A leak. Left is a train image, right a test image. Both are the same AIDER photo of a burning house (`collapsed_building_image0002`), with different people pasted in (orange boxes). A model can score well on C2A's own test split by remembering backgrounds.
-
-![C2A person size against image size, and C2A image sizes](assets/c2a_scale.png)
-
-Figure 6: C2A's pasted people ignore the scene's scale. Left: person size against image size (log scale; darker means more people). Most people are 4 to 24 px whether the image is 200 px or 4,000 px wide. Right: C2A image sizes. 80% are under 640 px, left of the dashed line, so training at `imgsz=640` scales them up without adding detail.
-
-![HERIDAL images per location, and background clustering scores](assets/heridal_backgrounds.png)
-
-Figure 7: how varied HERIDAL's backgrounds are. Left: images per location code (the filename prefix). VRD alone has about 340, and the last five locations have under 15 each. Right: our attempt to count distinct backgrounds by clustering ResNet-50 image embeddings (k-means) for k from 2 to 30. The silhouette score measures how cleanly images separate into k groups. It peaks at k = 29 but never passes 0.24, so the backgrounds don't form clean groups. The "about 15 sites" in the snapshot comes from the location codes instead.
+By day the ground warms up and most people barely stand out (median contrast 0.23); at night they do (1.06). The thermal sets are 8-bit JPEGs with no temperature values, so body temperature can't be learned from them. Sunlit rock can reach body temperature, which risks false alarms.
 
 ### RGB and thermal together
 
-From the 264 WiSARD pairs:
-
-| Measure | Value |
-| --- | --- |
-| Linear map, RGB-normalised → IR-normalised | x: 1.511·x − 0.273, y: 1.040·y − 0.038 |
-| IR footprint inside the RGB frame | x 0.18 to 0.84, y 0.04 to 1.00, 63.6% of RGB area |
-| Median error after the linear fit | 7.7 IR px, about half a person |
-| Person size ratio, RGB px ÷ IR px | 3.9× |
-
-- The cameras see overlapping but different areas, with a parallax that depends on height. A fixed linear map aligns them to about half a person, fine for matching boxes and too coarse for stacking pixels. Hence late fusion.
-- RGB carries about 15× more pixels per person and gives shape. Thermal gives figure-ground separation, especially at night. Trust thermal more at night and RGB more by day.
-- WiSARD's actors wear bright clothing. Dust-covered victims will look grey, which makes thermal more valuable for us than WiSARD suggests.
-- Pixel- or feature-level fusion would need thousands of registered pairs (the full WiSARD could provide them). A cascade, where thermal hot spots are confirmed by an RGB crop, is a cheap alternative to plain late fusion.
-
 ![WiSARD RGB frame with the thermal camera's footprint, next to the thermal frame](assets/wisard_footprint.png)
 
-Figure 8: one WiSARD frame from both cameras. Left, the 3840×2160 RGB frame; the green dashed box is the part the thermal camera also sees. Right, the 640×512 thermal frame. The orange boxes are the same four people. The thermal camera covers only part of the RGB view, and the people sit at different positions in each image, so the station has to map boxes from one camera to the other before it can match them (late fusion, step 2 in [SPEC.md](../../SPEC.md#late-fusion)).
+One WiSARD frame from both cameras. The green dashed box is the part of the 3840×2160 RGB frame that the 640×512 thermal camera also sees, and the orange boxes are the same four people.
+
+From 264 WiSARD pairs, a fixed linear map from RGB to thermal coordinates aligns people to a median 7.7 thermal px, about half a person. The thermal footprint covers 64% of the RGB frame, and a person is 3.9× larger in RGB pixels. That's close enough to match boxes but too coarse to stack pixels, hence late fusion. Trust thermal more at night and RGB more by day. Dust-covered victims will look grey in RGB, which makes thermal worth more to us than WiSARD's brightly dressed volunteers suggest.
 
 ### How high the drone can fly
 
-A standing person is about 0.45 m across from above (√area), a lying one about 0.9 m. A person is detectable down to 8 px (10 to be safe), so:
+A standing person is about 0.45 m across from above (√area), a lying one about 0.9 m. With detection down to 8 px (10 to be safe):
 
 `max altitude ≈ person size (m) × image width (px) ÷ (8 × 2·tan(HFOV/2))`
 
-With the assumed cameras (thermal 640×512 at 40° HFOV, RGB 1280×1024 at 72°), both give the same person size at every altitude, about 400 ÷ altitude px for a standing person. Camera specs are assumptions until we have the real drone.
+With the assumed cameras (thermal 640×512 at 40° HFOV, RGB 1280×1024 at 72°), both give the same person size at every altitude, about 400 ÷ altitude px for a standing person. The camera specs are assumptions until we have the real drone.
 
 | Altitude | Ground per pixel | Thermal native, or RGB 1280 tiled (standing / lying px) | RGB resized to 640 |
 | --- | --- | --- | --- |
@@ -463,32 +171,127 @@ With the assumed cameras (thermal 640×512 at 40° HFOV, RGB 1280×1024 at 72°)
 | 80 m | 9.1 cm | 5 / 10 | 2 / 5 |
 | 100 m | 11.4 cm | 4 / 8 | 2 / 4 |
 
-So the ceiling is about 49 m for standing people (40 m at 10 px) and about 80 m for lying ones. Resized RGB fails above about 25 m, which is why the station tiles it. A narrower lens raises the ceiling but covers less ground.
+The ceiling is about 49 m for standing people (40 m at 10 px) and about 80 m for lying ones. Resized RGB fails above about 25 m, which is why the station tiles it.
 
-No paper gives a maximum altitude, since it depends on the lens. This table compares each dataset's people to what our cameras would see:
+| Dataset | Flight altitude | What it means for us |
+| --- | --- | --- |
+| HIT-UAV | 60 to 130 m (paper) | Its people (16 px at 60 m, 11 px at 120 to 130 m) match our thermal camera at about 25 to 36 m, so its lens is much narrower than ours. |
+| HERIDAL | 40 to 65 m, 4K cameras ([paper](https://arxiv.org/pdf/2111.09406)) | The 853×640 export has a median 11 px person, about what our tiled 1280 RGB sees at 40 m. |
+| NII-CU-MAPD | 20 to 50 m | Our altitude band. Its 2706 px RGB shrinks about 4× at `imgsz=640`, which puts its people at 8 to 15 px; thermal (701 px) is close to ours. |
+| RGBTDronePerson | 50 to 80 m, 45 to 60° tilt (from a [secondary blog](https://zeeklog.com/gou-jian-ji-yu-wu-ren-ji-rgb-hong-wai-rgbt-shuang-mo-tai-xiao-mu-biao-xing-ren-jian-ce-xi-tong-wu-ren-ji-shi-jiao-xia-rgb-hong-wai-dui-qi-xing-ren-xiao-mu-biao-jian-ce-shu-ju-ji-hang-pa-4), not the paper) | Its median 11 px thermal person equals ours at about 36 m. Its oblique views aren't what a hovering drone sees. |
+| Archangel | 15 to 50 m in 5 m steps ([paper](https://arxiv.org/pdf/2209.00128)) | Reports accuracy by altitude across our whole band. Not read yet. |
+| NOMAD | 10 to 90 m ([paper](https://ar5iv.labs.arxiv.org/html/2309.09518)) | Goes past our ceiling, so it could show where detection stops. |
 
-| Dataset | Flight altitude | Source | What it means for us |
-| --- | --- | --- | --- |
-| HIT-UAV (thermal) | 60 to 130 m | Paper; our audit | People are 16 px at 60 m and 11 px at 120 to 130 m (Figure 3), so its lens is much narrower than ours (about 17°). Those sizes match our thermal camera at about 25 to 36 m, inside our hover band. The altitudes themselves don't carry over. |
-| HERIDAL (RGB, real SAR) | 40 to 65 m, 4K cameras | [Paper](https://arxiv.org/pdf/2111.09406) | At native 4K people are several times bigger than in our 1280 stream. The 640×640 Roboflow export we test on shrinks them to a median 11 px, about what our tiled 1280 RGB sees at 40 m, so the export is a fair test for our hover height. |
-| NII-CU-MAPD | 20 to 50 m | Project page | Same altitude band as ours. At `imgsz=640` its 2706 px RGB shrinks about 4×, so its RGB people are smaller than ours after tiling; thermal (701 px) is close to ours. |
-| RGBTDronePerson | 50 to 80 m, 45 to 60° tilt (unverified) | [Secondary blog](https://zeeklog.com/gou-jian-ji-yu-wu-ren-ji-rgb-hong-wai-rgbt-shuang-mo-tai-xiao-mu-biao-xing-ren-jian-ce-xi-tong-wu-ren-ji-shi-jiao-xia-rgb-hong-wai-dui-qi-xing-ren-xiao-mu-biao-jian-ce-shu-ju-ji-hang-pa-4), not the paper | Its median 11 px thermal person equals ours at about 36 m, so the thermal data matches a 40 m hover. Its oblique views are not what a hovering drone looking down sees. |
-| SARD | Not found | | Unknown. Check its person sizes against ours instead. |
-| Archangel | 15 to 50 m, in 5 m steps | [Paper](https://arxiv.org/pdf/2209.00128) | Spans our whole hover band, and the paper reports accuracy by altitude. Its results would show how much we lose between 30 and 49 m. Not read yet. |
-| NOMAD | 10 to 90 m | [Paper](https://ar5iv.labs.arxiv.org/html/2309.09518) | Goes past our 49 m ceiling, so it could test where our detector actually stops. A candidate, see [All candidates](#all-candidates). |
-| Lacmus (forest SAR) | About 50 m | Competition description | Right at our ceiling. Real SAR teams fly about this high. |
+Real SAR datasets fly at about 40 to 65 m, in line with this estimate. Lying victims, the likely case after an earthquake, allow about twice the altitude of standing ones.
 
-Real SAR datasets fly at about 40 to 65 m, the same as our estimate. Going higher only works with a narrower lens, which covers less ground: at a fixed resolution, every extra metre needs a proportionally narrower field of view. Lying victims, the likely case after an earthquake, allow about twice the altitude of standing ones.
+## More data
+
+RGB needs it most ([findings](#findings)). In order:
+
+| Dataset | Model | Why | Catch | Link |
+| --- | --- | --- | --- | --- |
+| NOMAD (2024) | RGB | Real footage of 100 actors walking, lying and hiding at 10 to 90 m, 42,825 frames | License and size unknown | [GitHub](https://github.com/ArtRuss/NOMAD) |
+| C2A (2024) | RGB | People on real disaster photos of rubble, fire and flood, 19% lying; MIT license | The people are pasted in at 4 to 24 px whatever the scene's scale, every image is crowded (median 34 people, none empty), and 98% of val/test backgrounds are also in train. Re-split by background and use a capped sample. | [GitHub](https://github.com/Ragib-Amin-Nihal/C2A) |
+| HERIDAL original | RGB | Same people at 4000×3000, for scale augmentation | 8.3 GB | [Zenodo](https://zenodo.org/records/5662351) |
+| AIResQ (2025) | Thermal | Real SAR, 9,788 images | Full set on request | [Sci. Data](https://www.nature.com/articles/s41597-026-07663-9) |
+| BIRDSAI (2020) | Thermal | Real aerial thermal, mostly night, CDLA-Permissive | Savanna, not disaster | [LILA](https://lila.science/datasets/conservationdrones/) |
+| VisDrone-DET (2018) | RGB | Many tiny people | City crowds; academic use only (unverified) | [GitHub](https://github.com/VisDrone/VisDrone-Dataset) |
+
+No dataset we know of has real people in real rubble. Our own staged clips would fill that: actors lying on rubble or a construction site, day and night, 20 to 60 m, both cameras. Even 200 to 500 labelled frames would be the most useful test set we could have.
 
 ## Scripts
 
-In [src/detection/](../../src/detection/). Each docstring has full usage. Raw data goes in `data/` and weights in `runs/`, both git-ignored. Setup: `python3 -m venv .venv && .venv/bin/pip install ultralytics pandas tabulate`.
+In [src/detection/](../../src/detection/); each docstring has full usage. Raw data goes in `data/` and weights in `runs/`, both git-ignored. Setup: `python3 -m venv .venv && .venv/bin/pip install ultralytics pandas tabulate`.
 
 | Script | Does |
 | --- | --- |
-| `detect.py` | Runs a model on an image or folder and writes the station's JSON detections. `python src/detection/detect.py best.pt FOLDER --out detections.json` |
-| `prepare.py` | Converts a YOLO- or COCO-labelled dataset to single-class `person` YOLO under `data/yolo/`. `python src/detection/prepare.py hit-uav --person-ids 0 --split train=IMG_DIR:COCO.json ...` |
-| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities), RGBTDronePerson (thermal, `uncertain` masked) and HERIDAL (un-stretched to 4:3, split by location, train and val cut into 640 crops) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
-| `train.py` | Trains one YOLO26 model per modality on its datasets, scores `best.pt` on every val and test split, and writes `results.md`. `python src/detection/train.py rgb thermal --epochs 100 [--tag NAME]` |
-| `eval_sizes.py` | AP50, recall and recall per person size across `imgsz` values and tiling, on a `data/yolo/` split. Writing into a run's `eval/` also refreshes its `results.md`. `python src/detection/eval_sizes.py MODEL.pt heridal test --imgsz 640 --tile 640 --out runs/rgb/RUN/eval/heridal-test.json` |
-| `report.py` | Writes `results.md` in a run folder: setup, training curve, scores, `eval/` results and plots. `python src/detection/report.py --all` |
+| `prepare.py` | Converts a YOLO- or COCO-labelled dataset to single-class `person` YOLO under `data/yolo/`. |
+| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities), RGBTDronePerson (thermal, `uncertain` masked) and HERIDAL (resized to 4:3, split by location, train and val cut into 640 crops). |
+| `train.py` | Trains one model per modality, scores `best.pt` on every val and test split, writes `results.md`. |
+| `eval_sizes.py` | AP50, precision and recall at confidence 0.25, and recall by person size, at any `imgsz` and tiled. Writing into a run's `eval/` refreshes its `results.md`. |
+| `report.py` | Rewrites a run's `results.md` from the files in its folder. `python src/detection/report.py --all` |
+| `detect.py` | Runs a model on an image or folder and writes the station's JSON detections. |
+
+## Results
+
+### Reading the metrics
+
+A detection counts as correct when its box overlaps a labelled person enough. Two settings sit behind that:
+
+- IoU (intersection over union): the overlap of the predicted and labelled boxes divided by the area they cover together. 1 is identical, 0 is no overlap.
+- Confidence: the model's 0 to 1 score for each box. A threshold keeps only boxes above it; `detect.py` uses 0.25. Lowering it finds more people and raises more false alarms.
+
+| Metric | What it measures | How much it matters here |
+| --- | --- | --- |
+| Recall | Share of the labelled people the model found. 0.80 means 1 person in 5 is missed. | Most. A missed person is a missed victim. |
+| Precision | Share of the model's boxes that are real people. 0.90 means 1 box in 10 is a false alarm. | Less. The operator checks every detection, and a false alarm costs seconds. |
+| AP50 | Area under the precision-recall curve, with a box correct at IoU 0.5 or more. One number for finding people with few false alarms across all thresholds. With one class it equals mAP50. | The main number for comparing models. |
+| AP50-95 | The same, averaged over IoU 0.50, 0.55 up to 0.95, so it rewards tight boxes. | A check on box quality only. |
+| Recall by size | Recall for people in size bins (√(box area) in px at the model input, or native px when tiled). | High. Our people are 10 to 15 px, and the totals hide how recall falls with size. |
+
+`scores.md` comes from Ultralytics, and its precision and recall are taken at the confidence with the best F1. `eval_sizes.py` takes them at 0.25, matching `detect.py`, and computes its own AP50, which differs from Ultralytics' in the third decimal. So the two recalls differ a little: SARD val is 0.908 in `scores.md` and 0.934 at 0.25.
+
+AP50-95 sits far below AP50 here because people are small. For a 10 px person, a box 2 px off on both axes has IoU 0.47 and already fails at 0.5, while the same error on a 50 px person still gives 0.85. AP50-95 ÷ AP50 is 0.68 on SARD (about 50 px people) and 0.34 on RGBTDronePerson (about 11 px). A 2 px error on a 10 px person doesn't change where the operator looks, so judge the models by recall and AP50.
+
+A rough guide for this project: AP50 above 0.9 is strong, 0.7 to 0.9 usable, below 0.5 poor.
+
+### Runs
+
+Each run folder has a `results.md` with its setup, val curve, the epoch `best.pt` came from, `scores.md`, every `eval_sizes.py` result and the plots.
+
+| Run | Data | Epochs (`best.pt`) | Own val AP50 | HERIDAL test, tiled: AP50 / recall |
+| --- | --- | --- | --- | --- |
+| [RGB YOLO26n](../../runs/rgb/yolo26n_e100/results.md) | SARD, NII-CU-MAPD | 100 (68) | 0.907 | 0.015 / 0.02 |
+| [RGB YOLO26s](../../runs/rgb/yolo26s_e70/results.md) | SARD, NII-CU-MAPD | 70 (55) | 0.889 | 0.009 / 0.03 |
+| [RGB YOLO26n + HERIDAL](../../runs/rgb/yolo26n_e60_heridal/results.md) | SARD, NII-CU-MAPD, HERIDAL train locations | 60 (52) | 0.862 (HERIDAL val included) | 0.215 / 0.22 |
+| [Thermal YOLO26n](../../runs/thermal/yolo26n_e100/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 100 (28) | 0.650 | n/a |
+| [Thermal YOLO26s](../../runs/thermal/yolo26s_e50/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 50 (28) | 0.666 | n/a |
+
+The current RGB model is YOLO26n + HERIDAL, and the current thermal model is YOLO26n.
+
+### Per dataset
+
+AP50 from `scores.md`. RGB rows without a split note are from the training sets' own val/test splits, which share flights or photos with train.
+
+| Data | Split | RGB n | RGB s | RGB n + HERIDAL | Thermal n | Thermal s |
+| --- | --- | --- | --- | --- | --- | --- |
+| SARD | val | 0.952 | 0.948 | 0.945 | | |
+| SARD | test | 0.945 | 0.946 | 0.941 | | |
+| NII-CU-MAPD RGB | val | 0.834 | 0.788 | 0.848 | | |
+| HERIDAL | val (unseen locations) | | | 0.220 | | |
+| HERIDAL | test (unseen locations), whole frames | 0.011 | 0.006 | 0.152 | | |
+| HERIDAL | test (unseen locations), tiled | 0.015 | 0.009 | 0.215 | | |
+| RGBTDronePerson | val | | | | 0.584 | 0.602 |
+| NII-CU-MAPD thermal | val | | | | 0.986 | 0.977 |
+| HIT-UAV | val | | | | 0.911 | 0.914 |
+| HIT-UAV | test | | | | 0.921 | 0.934 |
+
+HERIDAL rows are from `eval_sizes.py`, except val, which is Ultralytics.
+
+Recall at confidence 0.25 by person size, on the sets with people at the drone's size:
+
+| Data | Model | Under 8 px | 8 to 12 px | 12 to 16 px | 16 to 24 px |
+| --- | --- | --- | --- | --- | --- |
+| HERIDAL test, tiled | RGB n | 0.00 (49) | 0.00 (210) | 0.01 (195) | 0.08 (119) |
+| HERIDAL test, tiled | RGB n + HERIDAL | 0.22 (49) | 0.18 (210) | 0.26 (195) | 0.23 (119) |
+| RGBTDronePerson val | Thermal n | 0.32 (501) | 0.60 (7,850) | 0.64 (4,581) | 0.45 (1,406) |
+| HIT-UAV test | Thermal n | 0.75 (16) | 0.88 (548) | 0.91 (1,045) | 0.92 (858) |
+| NII-CU-MAPD thermal val | Thermal n | | 0.67 (36) | 0.97 (335) | 0.99 (413) |
+
+The bracket is the number of people in the bin. On NII-CU-MAPD RGB val, where people are 8 to 15 px at 640, the first RGB nano had recall 0.80.
+
+### Findings
+
+High scores on a dataset's own splits say little about new places. Both RGB models trained on SARD and NII-CU-MAPD scored above 0.9 AP50 on SARD and then found 2 to 3% of the people at HERIDAL's held-out locations, at 8 to 16 px almost none, tiled or not. It wasn't the conversion: the labels sit on the people, the models skipped people standing in plain view on open grass, and recall at IoU 0.25 was still 0.03. SARD's people are mostly over 32 px, and NII-CU-MAPD's small people are all on one baseball field in winter, so neither showed the models a 10 px person in natural terrain. An earlier thermal model trained on HIT-UAV did the same on WiSARD (AP50 0.87 on its own test, 0.01 on WiSARD).
+
+Adding HERIDAL's training locations raised AP50 on its unseen locations from 0.015 to 0.215 and tiled recall from 0.02 to 0.22, about the same at every size from under 8 px to 24 px. SARD stayed level (0.952 to 0.945) and NII-CU-MAPD rose (0.834 to 0.848). The model still misses about 78% of HERIDAL's people, and HERIDAL val (0.22, two other unseen locations) is no better, so the gap isn't down to which locations went into test. The combined val AP50 fell to 0.862 only because HERIDAL val is now part of it.
+
+Tiling helps on HERIDAL: 0.215 tiled against 0.152 on whole frames, since whole 853×640 frames shrink to 640 and people shrink with them.
+
+Model size isn't the limit. Small beat nano by 1.6 AP50 on thermal, all of it on RGBTDronePerson, and lost on RGB (0.889 against 0.907, and 0.788 against 0.834 on NII-CU-MAPD). Nano stays the default.
+
+Thermal overfits early. Both thermal models picked `best.pt` at epoch 28, and nano's val AP50 slid from 0.647 to 0.605 by epoch 100 while training loss kept dropping. The next thermal run should stop at 30 to 50 epochs.
+
+Thermal is good on HIT-UAV and NII-CU-MAPD (recall 0.88 to 0.97 at 8 to 16 px) and weak on RGBTDronePerson (0.60), which has tiny people in dense street scenes and `crowd` boxes that are hard to match at IoU 0.5. HIT-UAV's numbers are optimistic because of its near-duplicates, and thermal has no held-out test, so we don't know how it does at a new site.
+
+Next, in order: more RGB data like HERIDAL (NOMAD, then a capped C2A sample, one per run, each scored on HERIDAL's test locations), a thermal retrain at 30 to 50 epochs, and a held-out thermal test.

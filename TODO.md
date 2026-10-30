@@ -5,12 +5,13 @@ Start here. Tick a line when it's done, and delete it once nobody needs to see i
 ## In the lab
 
 - [x] Conversion and training scripts are in `src/detection/` (`convert.py`, `train.py`); commands, settings, SARD details and the NII-CU-MAPD variant are in [research/datasets/README.md](research/datasets/README.md#conversion-and-training).
-- [x] Train YOLO26n RGB and fill its own-val results ([results](research/datasets/README.md#yolo26n-rgb)).
-- [x] Train YOLO26n thermal and fill its own-val results ([results](research/datasets/README.md#yolo26n-thermal)).
+- [x] Train YOLO26n RGB and fill its own-val results ([results](research/datasets/README.md#runs)).
+- [x] Train YOLO26n thermal and fill its own-val results ([results](research/datasets/README.md#runs)).
 - [ ] Retrain YOLO26n thermal for 30 to 50 epochs (or with early stopping): val AP50 peaked at epoch 28 and fell after.
-- [x] Train YOLO26s RGB and thermal and compare with nano ([results](research/datasets/README.md#yolo26s-against-yolo26n)): small barely helps, nano stays the default.
+- [x] Train YOLO26s RGB and thermal and compare with nano ([results](research/datasets/README.md#findings)): small barely helps, nano stays the default.
 - [x] Score the RGB models on HERIDAL ([results](research/datasets/README.md#heridal)): AP50 about 0.01, both sizes, tiled or not.
-- [ ] Retrain YOLO26n RGB with HERIDAL (location split, `--tag heridal`) and compare on HERIDAL's held-out locations ([split](research/datasets/README.md#heridal)). Then try NOMAD (check its license) and a capped C2A sample, one per run.
+- [x] Retrain YOLO26n RGB with HERIDAL (location split, `--tag heridal`): HERIDAL test AP50 0.015 to 0.215, SARD and NII-CU-MAPD unchanged ([findings](research/datasets/README.md#findings)).
+- [ ] Add more RGB data like HERIDAL, one dataset per run, scored on HERIDAL's test locations: NOMAD (check its license), then a capped C2A sample ([more data](research/datasets/README.md#more-data)).
 - [ ] Score both models on WiSARD (download the WiSARD sample again; it was only kept in the dropped npz format).
 - [x] Check whether the RGB model saw RGBTDronePerson's RGB images. The first one did, and scored AP50 0.06 on them; `train.py` now trains RGB without them ([why](research/datasets/README.md#rgbtdroneperson)).
 - [ ] Test on WiSARD, which the models never trained on: convert it to `data/yolo/`, run `src/detection/eval_sizes.py` with and without `--tile 640`, fill the results table.

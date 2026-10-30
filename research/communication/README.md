@@ -30,7 +30,7 @@ robot. The Pi's onboard radio is not enough.
 | Robot RGB 640×512 | about 114 KiB (¼ of 1280) | 9 ms | 12.4 ms | 5 | 5 Mbit/s |
 
 Byte counts come from re-encoding the repo's own SAR imagery at each resolution. Detect times are
-the YOLO11n timings from the earlier [dataset audits](../datasets/README.md#what-the-earlier-audits-found), measured on an
+the YOLO11n timings from the earlier [dataset audits](../datasets/README.md#input-size-and-tiling), measured on an
 Apple Silicon laptop. FPS is set by the detector, not the link: 640 input is the AP50 peak on thermal at 0.872, and going
 to 1280 loses 12 points because the model has not seen people that large.
 

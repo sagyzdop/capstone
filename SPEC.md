@@ -68,7 +68,7 @@ All four streams go through the same two detectors and the same late fusion. Fra
 | YOLO26 (Ultralytics), nano first, then small. | Nano: 2.4M parameters, 5.5 GFLOPs, 40.9 COCO mAP50-95. Small: 9.5M, 20.9 GFLOPs, 48.6. Small is the step up if nano's accuracy falls short and the laptop has headroom. |
 | Two separate models, one RGB and one thermal, each trained only on its own modality. Datasets with both modalities are split by modality before training. | Late fusion: the models run independently on their own streams. |
 | Trained on the raw datasets with `imgsz=640`. | Ultralytics resizes on load, so no preprocessing step. |
-| Training sets. RGB: SARD and NII-CU-MAPD. Thermal: RGBTDronePerson, NII-CU-MAPD and HIT-UAV. | RGBTDronePerson's labels are drawn on its thermal images and miss people on its RGB images, so it trains thermal only. Details, caveats and results: [research/datasets/](research/datasets/README.md). |
+| Training sets. RGB: SARD, NII-CU-MAPD and HERIDAL (its training locations). Thermal: RGBTDronePerson, NII-CU-MAPD and HIT-UAV. | RGBTDronePerson's labels are drawn on its thermal images and miss people on its RGB images, so it trains thermal only. Details, caveats and results: [research/datasets/](research/datasets/README.md). |
 | Detector output is JSON, one record per box: `{"image", "bbox_xyxy", "conf"}`. | Already written by `src/detection/detect.py`. |
 
 ### Late fusion
