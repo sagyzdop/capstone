@@ -4,17 +4,27 @@ Two YOLO26 models on the station, one RGB and one thermal, fused late. The desig
 
 ## Training data
 
-All three datasets are used raw and trained at `imgsz=640`. Datasets with both modalities are split by modality, and each model sees only its own.
+All four datasets are trained at `imgsz=640`. Datasets with both modalities are split by modality, and each model sees only its own: RGB trains on SARD and NII-CU-MAPD, thermal on RGBTDronePerson, NII-CU-MAPD and HIT-UAV.
 
 | Dataset | Modality | What it is | License |
 | --- | --- | --- | --- |
 | [SARD](https://www.kaggle.com/datasets/nikolasgegenava/sard-search-and-rescue) (Kaggle copy; the [IEEE DataPort original](https://ieee-dataport.org/documents/search-and-rescue-image-dataset-person-detection-sard) needs a paid subscription) | RGB | Actors in search-and-rescue poses, including lying | Not stated |
 | [NII-CU-MAPD](https://www.nii-cu-multispectral.org/) | RGB + thermal | 5,880 aligned pairs, drone at 20 to 50 m over a baseball field, Chiba, Japan, January 2020 | CC BY-NC-SA 3.0 |
-| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | RGB + thermal | 6,125 pairs of tiny persons: streets, campuses, parks, piers; day and night, top-down and oblique | Not verified |
+| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal (RGB labels misaligned) | 6,125 pairs of tiny persons: streets, campuses, parks, piers; day and night, top-down and oblique | Not verified |
+| [HIT-UAV](https://zenodo.org/record/7633134) | Thermal | 2,898 images at 640×512, 60 to 130 m, campus and roads, day and night | CC0 (Zenodo; GitHub says CC BY 4.0) |
 
 ### SARD
 
-Details TBD: image count, resolution, splits and pose classes of the Kaggle copy.
+The copy we have is the Roboflow export `sard-8xjhy` v17 "TILES_3x3": each source photo is cut into a 3×3 grid and every tile stretched to 640×640. One class, `human`; the pose classes of the original are not in it. No augmentation.
+
+| | Train | Valid | Test |
+| --- | --- | --- | --- |
+| Tiles | 4,041 | 1,144 | 570 |
+| Source photos | 1,387 | 396 | 197 |
+| Persons | 5,229 | 1,463 | 732 |
+| Tiles with no person | 571 | 177 | 84 |
+
+The splits are by source photo: no photo has tiles in two splits. Tiling makes people about 3× larger than in the full photo, and the stretch changes their aspect ratio.
 
 ### NII-CU-MAPD
 
@@ -25,7 +35,7 @@ The zip (9.1 GB) has two variants:
 
 Native size is RGB 2706×1980 and thermal 701×513. At `imgsz=640` the RGB image shrinks about 4×, and its people with it. If RGB recall is poor on small people, train or run inference on tiles instead.
 
-Which variant we trained on: TBD.
+We train on `4-channel`.
 
 ### RGBTDronePerson
 
@@ -44,7 +54,19 @@ Both modalities are 640×512. People are tiny: median side √(w·h) about 11 px
 - Three train XMLs (`00065`, `00067`, `00076`) say 630×500 for 640×512 images. Take the size from the image; the boxes fit as drawn.
 - Thermal JPGs are three identical grey channels.
 - The authors' train/val split comes from videos, and about 5% of val frames have a near-identical train frame.
+- Training uses the thermal images only. Checked by drawing the labels on both modalities: on RGB, boxes sit beside the person, cover nobody, or fall on night frames where nobody is visible. An earlier RGB model trained with them scored AP50 0.06 on this val set.
 - Augmentation worth trying: a smaller `scale` (0.2 to 0.3 instead of 0.5, which can shrink an 11 px person to 5 px) and `flipud=0.5`, since most views are top-down.
+
+### HIT-UAV
+
+Thermal, 640×512, with classes Person, Car, Bicycle, OtherVehicle and DontCare. Only Person is kept; the 148 DontCare boxes become background.
+
+| | Train | Val | Test |
+| --- | --- | --- | --- |
+| Images | 2,008 | 287 | 571 |
+| Persons | 8,533 | 1,168 | 2,611 |
+
+42% of images have no person, the only good source of thermal negatives we train on. Its scores are optimistic: 31% of val/test images are near-duplicates of train ([leakage](#leakage-and-synthetic-artefacts)). Daytime people barely stand out ([thermal](#thermal)).
 
 ## Test data
 
@@ -57,7 +79,22 @@ Both need care. HERIDAL's shipped split leaks: 44 of its 101 test images have a 
 
 ## Conversion and training
 
-TBD: the scripts and commands used to convert each raw dataset to YOLO format and to train, the hardware, epochs and other settings. Add the scripts to `src/detection/`.
+Raw datasets go in `data/raw/`, unpacked as downloaded. Each is converted to single-class `person` YOLO under `data/yolo/`, with images symlinked to `data/raw/`:
+
+```
+R=data/raw/sard; python src/detection/prepare.py sard --person-ids 0 --split train=$R/train/images:$R/train/labels --split val=$R/valid/images:$R/valid/labels --split test=$R/test/images:$R/test/labels
+R=data/raw/hit-uav; python src/detection/prepare.py hit-uav --person-ids 0 --split train=$R/images/train:$R/labels/train --split val=$R/images/val:$R/labels/val --split test=$R/images/test:$R/labels/test
+python src/detection/convert.py nii-cu-mapd data/raw/nii-cu-mapd/4-channel
+python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson
+```
+
+Then train both models and score them on every val and test split:
+
+```
+python src/detection/train.py rgb thermal --epochs 100
+```
+
+Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopping, batch 32, seed 0, no image cache (caching in RAM ran the 30 GB lab computer out of memory), Ultralytics' default augmentation. Each model's val set is all its datasets' val splits together, and that picks `best.pt`. Lab computer: RTX 5080 (16 GB), about 35 s per RGB epoch. An interrupted run resumes when the same command is run again.
 
 ## Results
 
@@ -68,7 +105,7 @@ TBD: the scripts and commands used to convert each raw dataset to YOLO format an
 | YOLO26s | RGB | TBD | TBD | TBD |
 | YOLO26s | Thermal | TBD | TBD | n/a |
 
-Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights location: TBD.
+Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights: `runs/{rgb,thermal}/yolo26n_e100/weights/best.pt` on the lab computer (git-ignored), with `scores.md` next to them.
 
 ## Test on the station laptop
 
@@ -86,12 +123,11 @@ These numbers replace the predicted frame rates in [SPEC.md](../../SPEC.md#strea
 
 Only if the held-out scores fall short. In order:
 
-1. HIT-UAV (thermal, CC0, 2,898 images at 640×512, 60 to 130 m, campus and roads, day and night). `src/detection/prepare.py` already converts it. It has no disaster scenes, its daytime people barely stand out, and 31% of val/test images are near-duplicates of train images.
-2. C2A (RGB, MIT, 10,215 synthetic images: people pasted onto AIDER disaster photos of rubble, fire and flood, 19% lying). Re-split before use: each AIDER photo appears five times (`<disaster>_imageNNNN_<0-4>`), and the authors' split puts 98% of val/test photos in train too. Keep all five variants in one split, 60/20/20 within each disaster type. About a quarter of people stay under 8 px even at 640, and no image is empty, so negatives have to come from another set.
-3. AIResQ (thermal, real SAR, 9,788 images). Full set on request.
-4. NOMAD (RGB, real, 100 actors walking, lying and hiding at 10 to 90 m, 42,825 frames). License unclear.
-5. NII-CU-MAPD's `rgb-t` variant, for about 35% more boxes.
-6. BIRDSAI (thermal, savanna, mostly night, CDLA-Permissive) as a thermal backup, and VisDrone for generic pretraining.
+1. C2A (RGB, MIT, 10,215 synthetic images: people pasted onto AIDER disaster photos of rubble, fire and flood, 19% lying). Re-split before use: each AIDER photo appears five times (`<disaster>_imageNNNN_<0-4>`), and the authors' split puts 98% of val/test photos in train too. Keep all five variants in one split, 60/20/20 within each disaster type. About a quarter of people stay under 8 px even at 640, and no image is empty, so negatives have to come from another set.
+2. AIResQ (thermal, real SAR, 9,788 images). Full set on request.
+3. NOMAD (RGB, real, 100 actors walking, lying and hiding at 10 to 90 m, 42,825 frames). License unclear.
+4. NII-CU-MAPD's `rgb-t` variant, for about 35% more boxes.
+5. BIRDSAI (thermal, savanna, mostly night, CDLA-Permissive) as a thermal backup, and VisDrone for generic pretraining.
 
 No dataset we know of has real people in real rubble. Our own staged clips would fill that: actors lying on rubble or a construction site, day and night, 20 to 60 m, both cameras. Even 200 to 500 labelled frames would be the most valuable test set we could have.
 
@@ -106,7 +142,7 @@ No dataset we know of has real people in real rubble. Our own staged clips would
 | RGBTDronePerson (2023) | RGB + thermal | No: tiny persons, day + night | ? | 1.9 GB | [project](https://nnnnerd.github.io/RGBTDronePerson/) | Training (thermal; RGB labels misaligned) |
 | WiSARD (2022) | RGB + thermal | Partly: real wilderness SAR, day/night | Permissive notice, not a named license | 40.5 GB (sample 0.97 GB) | [project](https://sites.google.com/uw.edu/wisard/) | Test (sample) |
 | HERIDAL (2019) | RGB | Partly: real SAR, wilderness, lying/hidden people | CC BY 3.0 (Zenodo) / CC BY 4.0 (Roboflow) | 8.3 GB (export 167 MB) | [Zenodo 5662351](https://zenodo.org/records/5662351) | Test (Roboflow export) |
-| HIT-UAV (2023) | Thermal | No: campus/roads, 60 to 130 m | CC0 (Zenodo API; GitHub says CC BY 4.0) | 815 MB | [Zenodo 7633134](https://zenodo.org/record/7633134) | Analysed; next thermal set. Ships COCO json + VOC xml |
+| HIT-UAV (2023) | Thermal | No: campus/roads, 60 to 130 m | CC0 (Zenodo API; GitHub says CC BY 4.0) | 815 MB | [Zenodo 7633134](https://zenodo.org/record/7633134) | Training (thermal) |
 | C2A (2024) | RGB | Yes: synthetic people on AIDER disaster scenes | MIT (Kaggle page) | 4.9 GB | [GitHub](https://github.com/Ragib-Amin-Nihal/C2A), [Kaggle](https://www.kaggle.com/datasets/rgbnihal/c2a-dataset) | Analysed; next RGB set, after re-split |
 | AIResQ (2025) | Thermal | Yes: SAR, 9,788 images | ? | ? | [Nature Sci. Data](https://www.nature.com/articles/s41597-026-07663-9) | Candidate; full set on request |
 | NOMAD (2024) | RGB | Partly: real, 100 actors, 10 to 90 m, 42,825 frames | ? | ? | [GitHub](https://github.com/ArtRuss/NOMAD) | Candidate; license and size unknown |
@@ -275,10 +311,12 @@ Real SAR datasets fly at about 40 to 65 m, the same as our estimate. Going highe
 
 ## Scripts
 
-In [src/detection/](../../src/detection/). Each docstring has full usage. Raw data goes in `data/` and weights in `runs/`, both git-ignored. Setup: `python3 -m venv .venv && .venv/bin/pip install ultralytics`.
+In [src/detection/](../../src/detection/). Each docstring has full usage. Raw data goes in `data/` and weights in `runs/`, both git-ignored. Setup: `python3 -m venv .venv && .venv/bin/pip install ultralytics pandas tabulate`.
 
 | Script | Does |
 | --- | --- |
 | `detect.py` | Runs a model on an image or folder and writes the station's JSON detections. `python src/detection/detect.py best.pt FOLDER --out detections.json` |
 | `prepare.py` | Converts a YOLO- or COCO-labelled dataset to single-class `person` YOLO under `data/yolo/`. `python src/detection/prepare.py hit-uav --person-ids 0 --split train=IMG_DIR:COCO.json ...` |
+| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities) and RGBTDronePerson (thermal, `uncertain` masked) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
+| `train.py` | Trains one YOLO26 model per modality on its datasets and scores `best.pt` on every val and test split. `python src/detection/train.py rgb thermal --epochs 100` |
 | `eval_sizes.py` | AP50, recall and recall per person size across `imgsz` values and tiling, on a `data/yolo/` split. `python src/detection/eval_sizes.py MODEL.pt wisard-vis val --imgsz 640 1280 --tile 640 --out OUT.json` |
