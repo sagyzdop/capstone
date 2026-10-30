@@ -1,0 +1,6 @@
+train:
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/train
+val:
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/val
+names:
+  0: person

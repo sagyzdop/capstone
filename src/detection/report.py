@@ -28,6 +28,7 @@ PLOTS = [  # (file, caption)
 ]
 NOTES = {  # eval file stem -> what the split is, where the name alone doesn't say
     "heridal-test": "HERIDAL's held-out locations (MED, BRA, CAP, SB, BLI, CAB), whole 853×640 frames.",
+    "heridal-test-last": "As heridal-test, with last.pt (the final epoch) instead of best.pt.",
     "heridal-v1-unique": "First HERIDAL conversion, before the location split: one frame per distinct view over all 1,579 frames.",
     "heridal-v1-roboflow-test": "First HERIDAL conversion, before the location split: Roboflow's 101-image test split.",
 }
@@ -108,7 +109,7 @@ def write(run):
     if scores.exists():
         parts += ["", "## Scores (ultralytics, best.pt)", "",
                   "P and R at the confidence with the best F1. `all` is every val set together.", "",
-                  "\n".join(lines[2:])]
+                  "\n".join(scores.read_text().splitlines()[2:])]
     if (run / "eval").is_dir() and any((run / "eval").glob("*.json")):
         parts += ["", "## eval_sizes.py", "",
                   "AP50 by `eval_sizes.py`; P and R at confidence 0.25; recall by person size (√area in px at the model "
