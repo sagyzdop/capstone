@@ -1,0 +1,10 @@
+train:
+  - /home/nurbek/Downloads/capstone/data/yolo/sard/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/nii-cu-mapd-rgb/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/train
+val:
+  - /home/nurbek/Downloads/capstone/data/yolo/heridal/images/val
+names:
+  0: person

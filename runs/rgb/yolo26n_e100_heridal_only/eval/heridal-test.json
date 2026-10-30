@@ -1,0 +1,74 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 303,
+  "persons": 582,
+  "ap": 0.151,
+  "precision": 0.503,
+  "recall": 0.143,
+  "recall_by_size": {
+   "0-8": {
+    "n": 49,
+    "recall": 0.02
+   },
+   "8-12": {
+    "n": 210,
+    "recall": 0.067
+   },
+   "12-16": {
+    "n": 195,
+    "recall": 0.185
+   },
+   "16-24": {
+    "n": 119,
+    "recall": 0.244
+   },
+   "24-32": {
+    "n": 9,
+    "recall": 0.333
+   }
+  },
+  "ms_per_image_median": 4.7,
+  "model": "best.pt",
+  "dataset": "heridal",
+  "split": "test"
+ },
+ {
+  "imgsz": 640,
+  "tile": 640,
+  "iou": 0.5,
+  "images": 303,
+  "persons": 582,
+  "ap": 0.195,
+  "precision": 0.545,
+  "recall": 0.198,
+  "recall_by_size": {
+   "0-8": {
+    "n": 49,
+    "recall": 0.102
+   },
+   "8-12": {
+    "n": 210,
+    "recall": 0.152
+   },
+   "12-16": {
+    "n": 195,
+    "recall": 0.241
+   },
+   "16-24": {
+    "n": 119,
+    "recall": 0.235
+   },
+   "24-32": {
+    "n": 9,
+    "recall": 0.333
+   }
+  },
+  "ms_per_image_median": 7.6,
+  "model": "best.pt",
+  "dataset": "heridal",
+  "split": "test"
+ }
+]

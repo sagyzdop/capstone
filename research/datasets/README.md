@@ -244,10 +244,12 @@ Each run folder has a `results.md` with its setup, val curve, the epoch `best.pt
 | [RGB YOLO26n](../../runs/rgb/yolo26n_e100/results.md) | SARD, NII-CU-MAPD | 100 (68) | 0.907 | 0.015 / 0.02 |
 | [RGB YOLO26s](../../runs/rgb/yolo26s_e70/results.md) | SARD, NII-CU-MAPD | 70 (55) | 0.889 | 0.009 / 0.03 |
 | [RGB YOLO26n + HERIDAL](../../runs/rgb/yolo26n_e60_heridal/results.md) | SARD, NII-CU-MAPD, HERIDAL train locations | 60 (52) | 0.862 (HERIDAL val included) | 0.215 / 0.22 |
+| [RGB YOLO26n + HERIDAL ×3](../../runs/rgb/yolo26n_e60_heridalx3_valh_s025/results.md) | Same, HERIDAL listed 3×; `best.pt` picked on HERIDAL val; rescale ±25% | 60 (11) | 0.242 (HERIDAL val only) | 0.166 / 0.17 (`last.pt` 0.122 / 0.14) |
+| [RGB YOLO26n, HERIDAL only](../../runs/rgb/yolo26n_e100_heridal_only/results.md) | HERIDAL train locations | 100 (76) | 0.246 (HERIDAL val only) | 0.195 / 0.20 (`last.pt` 0.184 / 0.19) |
 | [Thermal YOLO26n](../../runs/thermal/yolo26n_e100/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 100 (28) | 0.650 | n/a |
 | [Thermal YOLO26s](../../runs/thermal/yolo26s_e50/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 50 (28) | 0.666 | n/a |
 
-The current RGB model is YOLO26n + HERIDAL, and the current thermal model is YOLO26n.
+The current RGB model is YOLO26n + HERIDAL (`yolo26n_e60_heridal`), and the current thermal model is YOLO26n (`yolo26n_e100`).
 
 ### Per dataset
 
@@ -268,12 +270,24 @@ AP50 from `scores.md`. RGB rows without a split note are from the training sets'
 
 HERIDAL rows are from `eval_sizes.py`, except val, which is Ultralytics.
 
+The two HERIDAL experiments, against the current RGB model:
+
+| Data | Split | RGB n + HERIDAL | HERIDAL ×3 | HERIDAL only |
+| --- | --- | --- | --- | --- |
+| SARD | val | 0.945 | 0.832 | 0.001 |
+| SARD | test | 0.941 | 0.833 | 0.001 |
+| NII-CU-MAPD RGB | val | 0.848 | 0.778 | 0.141 |
+| HERIDAL | val | 0.220 | 0.242 | 0.246 |
+| HERIDAL | test, tiled, `best.pt` | 0.215 | 0.166 | 0.195 |
+| HERIDAL | test, tiled, `last.pt` | (`best.pt` is epoch 52 of 60) | 0.122 | 0.184 |
+
 Recall at confidence 0.25 by person size, on the sets with people at the drone's size:
 
 | Data | Model | Under 8 px | 8 to 12 px | 12 to 16 px | 16 to 24 px |
 | --- | --- | --- | --- | --- | --- |
 | HERIDAL test, tiled | RGB n | 0.00 (49) | 0.00 (210) | 0.01 (195) | 0.08 (119) |
 | HERIDAL test, tiled | RGB n + HERIDAL | 0.22 (49) | 0.18 (210) | 0.26 (195) | 0.23 (119) |
+| HERIDAL test, tiled | RGB n, HERIDAL only | 0.10 (49) | 0.15 (210) | 0.24 (195) | 0.24 (119) |
 | RGBTDronePerson val | Thermal n | 0.32 (501) | 0.60 (7,850) | 0.64 (4,581) | 0.45 (1,406) |
 | HIT-UAV test | Thermal n | 0.75 (16) | 0.88 (548) | 0.91 (1,045) | 0.92 (858) |
 | NII-CU-MAPD thermal val | Thermal n | | 0.67 (36) | 0.97 (335) | 0.99 (413) |
@@ -288,10 +302,39 @@ Adding HERIDAL's training locations raised AP50 on its unseen locations from 0.0
 
 Tiling helps on HERIDAL: 0.215 tiled against 0.152 on whole frames, since whole 853×640 frames shrink to 640 and people shrink with them.
 
+Most misses are real misses, not loose boxes. When a box only has to overlap a person by 25% (IoU 0.25), the current RGB model's tiled AP50 on HERIDAL test rises to 0.389 and recall to 0.30 at precision 0.76. About 70% of HERIDAL's people still get no box at all.
+
+SARD and NII-CU-MAPD don't hold the model back on HERIDAL. Trained on HERIDAL alone, nano reached 0.195 AP50 and 0.20 recall on HERIDAL test, against 0.215 and 0.22 for the mixed model. With 582 test people, recall moves by about ±0.02 from sampling alone, so the two are level on HERIDAL. Without the other datasets, though, the model can't detect anyone in SARD (AP50 0.001), so it would be useless at the robot's close range.
+
+Weighting HERIDAL up made things worse. Listing HERIDAL 3×, picking `best.pt` on HERIDAL val and narrowing the random rescale to ±25% gave 0.166 AP50 with `best.pt` and 0.122 with `last.pt`, and SARD fell from 0.945 to 0.832. The three changes went in together, so the run can't say which one hurt. Overfitting is the likely cause: HERIDAL val peaked at epoch 11 and never got back there (0.14 to 0.19 afterwards), which fits 1,090 frames from 9 locations being seen three times as often.
+
+HERIDAL val is too small to pick an epoch. It has 174 people, and in the HERIDAL-only run its AP50 swung between 0.12 and 0.25 from one epoch to the next with no trend. Choosing `best.pt` on it picks noise (epoch 11 of 60 in the ×3 run). Keep picking on the combined val set.
+
 Model size isn't the limit. Small beat nano by 1.6 AP50 on thermal, all of it on RGBTDronePerson, and lost on RGB (0.889 against 0.907, and 0.788 against 0.834 on NII-CU-MAPD). Nano stays the default.
 
 Thermal overfits early. Both thermal models picked `best.pt` at epoch 28, and nano's val AP50 slid from 0.647 to 0.605 by epoch 100 while training loss kept dropping. The next thermal run should stop at 30 to 50 epochs.
 
 Thermal is good on HIT-UAV and NII-CU-MAPD (recall 0.88 to 0.97 at 8 to 16 px) and weak on RGBTDronePerson (0.60), which has tiny people in dense street scenes and `crowd` boxes that are hard to match at IoU 0.5. HIT-UAV's numbers are optimistic because of its near-duplicates, and thermal has no held-out test, so we don't know how it does at a new site.
 
-Next, in order: more RGB data like HERIDAL (NOMAD, then a capped C2A sample, one per run, each scored on HERIDAL's test locations), a thermal retrain at 30 to 50 epochs, and a held-out thermal test.
+## Verdict
+
+Neither model is ready for a real search. Both are good on the data they trained on and unproven or weak anywhere else.
+
+The RGB model to use is YOLO26n + HERIDAL (`runs/rgb/yolo26n_e60_heridal`), run on 640 tiles. At locations it has never seen it finds about 22% of people in a single frame (30% if a rough box is enough), with about half its boxes correct at confidence 0.25. It keeps SARD (0.945) and NII-CU-MAPD (0.848) where they were. For an operator that's an aid that sometimes points at a person, not a detector to rely on. A hovering drone sees each person in many frames, which raises the chance of a hit over time, but misses tend to repeat on the same hard person, so per-frame recall is the honest number.
+
+The thermal model to use is YOLO26n (`runs/thermal/yolo26n_e100`). It finds 88 to 97% of people at the drone's size on HIT-UAV and NII-CU-MAPD and 60% on RGBTDronePerson, but all three are its training sets' own splits. The last time a thermal model met a new site (HIT-UAV model on WiSARD), it fell to near zero, so its real performance is unknown.
+
+What limits both is data, not the model or the training recipe. Neither a 3× larger model nor training on HERIDAL alone nor weighting HERIDAL up beat simply adding HERIDAL to the mix. The one change that moved RGB on unseen terrain was 1,090 frames of people at the drone's size in natural terrain, and those frames now seem used up: with or without the other datasets, HERIDAL takes nano to about 0.2 AP50 and no further.
+
+## Next steps
+
+In order. Score every RGB run on HERIDAL's test locations, tiled, against 0.215 AP50 and 0.22 recall, and keep picking `best.pt` on the combined val set.
+
+1. More RGB data with people at the drone's size in natural terrain, one dataset per run so each one's effect is visible: NOMAD first (check its license), then a capped, re-split C2A sample.
+2. Get a held-out thermal test. Without one, nothing says the thermal model works at a new site. WiSARD's thermal frames or AIResQ are the candidates.
+3. Retrain thermal for 30 to 50 epochs; it peaked at epoch 28 in both runs.
+4. If more RGB data still leaves 8 to 12 px recall low, try a P2 (stride-4) head for small objects, and download the HERIDAL original for scale augmentation from sharp frames.
+5. On the operations side, flying at 30 m instead of 40 m makes a standing person about 13 px instead of 10 ([altitude table](#how-high-the-drone-can-fly)), and the current RGB model's recall is higher at 12 to 16 px than at 8 to 12 px (0.26 against 0.18).
+6. Then run the [laptop test](#test-on-the-station-laptop) with the chosen models.
+
+Don't repeat: weighting HERIDAL up, picking `best.pt` on HERIDAL val alone, or training RGB without SARD and NII-CU-MAPD.
