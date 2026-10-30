@@ -22,6 +22,8 @@ from PIL import Image
 from torchvision.ops import nms
 from ultralytics import YOLO
 
+import report
+
 ROOT = Path(__file__).resolve().parents[2] / "data" / "yolo"
 SIZE_BINS = [0, 8, 12, 16, 24, 32, 64, 1e9]
 CONF = 0.25  # operating point for precision / recall
@@ -137,6 +139,9 @@ def main():
         results.append(r)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1))
+    run = args.out.parent.parent
+    if args.out.parent.name == "eval" and (run / "args.yaml").exists():  # a training run's eval/: refresh its results.md
+        report.write(run)
 
 
 if __name__ == "__main__":

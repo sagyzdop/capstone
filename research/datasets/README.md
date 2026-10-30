@@ -103,12 +103,25 @@ Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopp
 
 | Model | Modality | Own val | WiSARD | HERIDAL |
 | --- | --- | --- | --- | --- |
-| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | TBD | AP50 0.007, recall 0.02 ([below](#heridal)) |
-| YOLO26n | Thermal | AP50 0.650, recall 0.62 ([below](#yolo26n-thermal)) | TBD | n/a (RGB only) |
-| YOLO26s | RGB | AP50 0.889, recall 0.85 ([below](#yolo26s-against-yolo26n)) | TBD | AP50 0.012, recall 0.03 ([below](#heridal)) |
-| YOLO26s | Thermal | AP50 0.666, recall 0.64 ([below](#yolo26s-against-yolo26n)) | TBD | n/a |
+| Model | Modality | Own val | WiSARD | HERIDAL test locations, tiled |
+| --- | --- | --- | --- | --- |
+| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | Later | AP50 0.015, recall 0.02 ([below](#heridal)) |
+| YOLO26n | Thermal | AP50 0.650, recall 0.62 ([below](#yolo26n-thermal)) | Later | n/a (RGB only) |
+| YOLO26s | RGB | AP50 0.889, recall 0.85 ([below](#yolo26s-against-yolo26n)) | Later | AP50 0.009, recall 0.03 ([below](#heridal)) |
+| YOLO26s | Thermal | AP50 0.666, recall 0.64 ([below](#yolo26s-against-yolo26n)) | Later | n/a |
+| YOLO26n + HERIDAL | RGB | Training ([below](#yolo26n-rgb-with-heridal)) | Later | Training |
 
-Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights: `runs/{rgb,thermal}/yolo26n_e100/weights/best.pt` on the lab computer (git-ignored), with `scores.md` next to them.
+WiSARD is out of scope for now. Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling.
+
+Each run has its own folder, `runs/<rgb|thermal>/<model>_e<epochs>[_<tag>]/`. Its `results.md` puts everything on one page: setup, the val curve and the epoch `best.pt` came from, `scores.md`, every `eval_sizes.py` result in `eval/`, and the plots (training curves, precision-recall and F1 curves, confusion matrix, label statistics, one val batch with labels and predictions). `train.py` and `eval_sizes.py` rewrite it when they finish; `python src/detection/report.py --all` rewrites every run's. Weights (`weights/best.pt`) stay on the lab computer, git-ignored.
+
+| Run | Data | results.md |
+| --- | --- | --- |
+| YOLO26n RGB, 100 epochs | SARD, NII-CU-MAPD | [runs/rgb/yolo26n_e100](../../runs/rgb/yolo26n_e100/results.md) |
+| YOLO26s RGB, 70 epochs | SARD, NII-CU-MAPD | [runs/rgb/yolo26s_e70](../../runs/rgb/yolo26s_e70/results.md) |
+| YOLO26n RGB + HERIDAL, 60 epochs | SARD, NII-CU-MAPD, HERIDAL train locations | `runs/rgb/yolo26n_e60_heridal` (training) |
+| YOLO26n thermal, 100 epochs | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | [runs/thermal/yolo26n_e100](../../runs/thermal/yolo26n_e100/results.md) |
+| YOLO26s thermal, 50 epochs | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | [runs/thermal/yolo26s_e50](../../runs/thermal/yolo26s_e50/results.md) |
 
 ### Reading the metrics
 
@@ -167,7 +180,7 @@ Recall by person size at the model input (native size × 640 / long side), conf 
 - NII-CU-MAPD is the only set with people at the drone's size (about 10 px). Recall there is about 0.8 at 8 to 15 px, so the drone's RGB tiles should work, if the scenes transfer.
 - SARD's people are mostly over 32 px, so its 0.95 says little about the drone. Below 24 px it misses half or more, on few examples. It fits the robot's close-range view.
 - These are the training datasets' own splits, from the same flights as train. The held-out WiSARD and HERIDAL scores are the real test.
-- Raw output: `runs/rgb/yolo26n_e100/scores.md` and `runs/rgb/yolo26n_e100/eval/*.json` on the lab computer.
+- Everything for this run, plots included: [runs/rgb/yolo26n_e100/results.md](../../runs/rgb/yolo26n_e100/results.md).
 
 ### YOLO26n thermal
 
@@ -195,7 +208,7 @@ Recall by person size, conf 0.25:
 - NII-CU-MAPD (0.986) is nearly solved: one field, people standing apart in the open.
 - HIT-UAV scores are optimistic: 31% of its val/test images are near-duplicates of train.
 - As for RGB, these are the training datasets' own splits. The held-out WiSARD thermal score is the real test; an earlier HIT-UAV-only model scored 0.87 on HIT-UAV test and 0.01 on WiSARD.
-- Raw output: `runs/thermal/yolo26n_e100/scores.md` and `runs/thermal/yolo26n_e100/eval/*.json` on the lab computer.
+- Everything for this run, plots included: [runs/thermal/yolo26n_e100/results.md](../../runs/thermal/yolo26n_e100/results.md).
 
 ### YOLO26s against YOLO26n
 
@@ -218,7 +231,7 @@ AP50 from `scores.md` (ultralytics), recall from `eval_sizes.py` at imgsz 640.
 - RGB: small is no better, and is worse on NII-CU-MAPD, the set with drone-sized people.
 - Thermal: small gains about 1.5 AP50 overall, all of it on RGBTDronePerson (recall 0.58 to 0.62, mostly at 8 to 16 px). On the other sets the two are within noise.
 - Both thermal models peak at epoch 28, and a model with 3× the parameters barely helps, so the limit is the training data, not the model size. Nano stays the default; the held-out [HERIDAL](#heridal) result agrees.
-- Raw output: `runs/{rgb/yolo26s_e70,thermal/yolo26s_e50}/scores.md` and `eval/*.json`.
+- Everything per run, plots included: [RGB](../../runs/rgb/yolo26s_e70/results.md), [thermal](../../runs/thermal/yolo26s_e50/results.md).
 
 ### HERIDAL
 
@@ -249,6 +262,21 @@ Models trained without HERIDAL, on its test locations, tiled 640 (`eval_sizes.py
 - It isn't the conversion or the box style. The labels sit on the people (checked by drawing them), the models skip people who are plainly visible on open grass, and at IoU 0.25 nano still has recall 0.03.
 - Same pattern as the earlier thermal audit ([below](#models-dont-transfer-between-datasets)): high scores on the training sets' own splits, near zero on a new site. SARD's people are mostly over 32 px, and NII-CU-MAPD's small people are all on one baseball field in winter. Neither has people in natural terrain at 10 px.
 - Raw output: `runs/rgb/{yolo26n_e100,yolo26s_e70}/eval/heridal-test.json`.
+
+### YOLO26n RGB with HERIDAL
+
+Training now: YOLO26n, 60 epochs, on SARD, NII-CU-MAPD and the HERIDAL train locations; HERIDAL val joins the combined val set. Started 2026-10-30 with
+
+```
+systemd-inhibit --what=sleep:idle --why="YOLO26n RGB + HERIDAL" systemd-run --user --scope -p MemoryMax=18G -p MemorySwapMax=0 bash -c '.venv/bin/python src/detection/train.py rgb --model yolo26n.pt --epochs 60 --tag heridal && .venv/bin/python src/detection/eval_sizes.py runs/rgb/yolo26n_e60_heridal/weights/best.pt heridal test --imgsz 640 --tile 640 --device 0 --out runs/rgb/yolo26n_e60_heridal/eval/heridal-test.json' 2>&1 | tee runs/train_yolo26n_heridal.log
+```
+
+What decides it, all in `runs/rgb/yolo26n_e60_heridal/results.md` when it finishes:
+
+- HERIDAL test locations, tiled: AP50 and recall at 8 to 16 px against 0.015 and 0.00 for the model without HERIDAL ([above](#heridal)).
+- SARD and NII-CU-MAPD val in `scores.md` should stay near 0.95 and 0.83 AP50. A drop means HERIDAL's tiny people pull the model away from the larger ones.
+
+Its combined val set now includes HERIDAL, so its "all val" AP50 isn't comparable with the earlier RGB runs.
 
 ## Test on the station laptop
 
@@ -460,6 +488,7 @@ In [src/detection/](../../src/detection/). Each docstring has full usage. Raw da
 | --- | --- |
 | `detect.py` | Runs a model on an image or folder and writes the station's JSON detections. `python src/detection/detect.py best.pt FOLDER --out detections.json` |
 | `prepare.py` | Converts a YOLO- or COCO-labelled dataset to single-class `person` YOLO under `data/yolo/`. `python src/detection/prepare.py hit-uav --person-ids 0 --split train=IMG_DIR:COCO.json ...` |
-| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities), RGBTDronePerson (thermal, `uncertain` masked) and HERIDAL (test only, un-stretched to 4:3, one frame per view) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
-| `train.py` | Trains one YOLO26 model per modality on its datasets and scores `best.pt` on every val and test split. `python src/detection/train.py rgb thermal --epochs 100` |
-| `eval_sizes.py` | AP50, recall and recall per person size across `imgsz` values and tiling, on a `data/yolo/` split. `python src/detection/eval_sizes.py MODEL.pt wisard-vis val --imgsz 640 1280 --tile 640 --out OUT.json` |
+| `convert.py` | Converts NII-CU-MAPD (`4-channel`, both modalities), RGBTDronePerson (thermal, `uncertain` masked) and HERIDAL (un-stretched to 4:3, split by location, train and val cut into 640 crops) to `data/yolo/`. `python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson` |
+| `train.py` | Trains one YOLO26 model per modality on its datasets, scores `best.pt` on every val and test split, and writes `results.md`. `python src/detection/train.py rgb thermal --epochs 100 [--tag NAME]` |
+| `eval_sizes.py` | AP50, recall and recall per person size across `imgsz` values and tiling, on a `data/yolo/` split. Writing into a run's `eval/` also refreshes its `results.md`. `python src/detection/eval_sizes.py MODEL.pt heridal test --imgsz 640 --tile 640 --out runs/rgb/RUN/eval/heridal-test.json` |
+| `report.py` | Writes `results.md` in a run folder: setup, training curve, scores, `eval/` results and plots. `python src/detection/report.py --all` |

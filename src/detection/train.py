@@ -4,8 +4,9 @@ rgb:     SARD + NII-CU-MAPD RGB + HERIDAL (location split; runs before 2026-10-3
 thermal: RGBTDronePerson thermal + NII-CU-MAPD thermal + HIT-UAV
 
 Needs the datasets in data/yolo/ (see research/datasets/README.md#conversion-and-training). Writes
-data/yolo/{rgb,thermal}.yaml, runs/<modality>/<name>/ (ultralytics output) and runs/<modality>/<name>/scores.md:
-AP50, AP50-95, precision and recall on every split of every dataset, plus all val sets together.
+data/yolo/{rgb,thermal}.yaml, runs/<modality>/<name>/ (ultralytics output), runs/<modality>/<name>/scores.md:
+AP50, AP50-95, precision and recall on every split of every dataset, plus all val sets together, and results.md
+(report.py).
 Re-running resumes an interrupted run from last.pt, and only rescores a finished one.
 
 Usage:
@@ -18,6 +19,8 @@ from pathlib import Path
 
 import pandas as pd
 from ultralytics import YOLO
+
+import report
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data" / "yolo"
@@ -80,6 +83,7 @@ def main():
                                        batch=args.batch, cache=False, workers=8, seed=0,
                                        project=str(run.parent), name=run.name, exist_ok=True)
         score(run / "weights" / "best.pt", mod, run)
+        report.write(run)
 
 
 if __name__ == "__main__":
