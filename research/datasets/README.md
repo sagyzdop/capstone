@@ -107,6 +107,41 @@ Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopp
 
 Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights: `runs/{rgb,thermal}/yolo26n_e100/weights/best.pt` on the lab computer (git-ignored), with `scores.md` next to them.
 
+### Reading the metrics
+
+Every metric compares the model's boxes with the hand-drawn ones. A detection is correct when its box overlaps a labelled person enough, and there are two settings behind that:
+
+- **IoU** (intersection over union): the overlap area of the predicted and the labelled box, divided by the area they cover together. 1 is identical, 0 is no overlap.
+- **Confidence**: the model's score from 0 to 1 for each box. A threshold keeps only boxes above it; `detect.py` uses 0.25. Lowering it finds more people and raises more false alarms.
+
+| Metric | What it measures | How to read it | How much it matters here |
+| --- | --- | --- | --- |
+| Recall (R) | Share of the labelled people the model found. | 0.80 means 1 person in 5 is missed. | Most important. A missed person is a missed victim. |
+| Precision (P) | Share of the model's boxes that are real people. | 0.90 means 1 box in 10 is a false alarm. | Less important. The operator checks every detection, and a false alarm costs seconds. |
+| AP50 | Average precision with a box counted as correct at IoU 0.5 or more: the area under the precision-recall curve as the threshold sweeps from strict to loose. One number that rewards finding people with few false alarms at every threshold. With one class it equals mAP50. | Compare models and datasets with it. | The main number for comparing models. |
+| AP50-95 | The same, averaged over ten IoU levels, 0.50, 0.55, up to 0.95. It rewards tightly fitting boxes. | A tighter-box score, always below AP50. | Secondary: only a check on box quality. |
+| Recall by size | Recall for people in size bins (√(box area) in pixels at the model input). | The row for about 10 px is the one that tells how the drone will do. | High. Our people are 10 to 15 px, and the overall numbers hide how recall falls with size. |
+
+How the numbers in this file were made:
+
+- `scores.md` comes from ultralytics. Its P and R are taken at the confidence that gives the best balance of the two (maximum F1), not at 0.25.
+- "Recall at conf 0.25" and "recall by size" come from `eval_sizes.py`, so they match what `detect.py` will output. Its AP50 is its own implementation and differs from ultralytics' in the third decimal.
+- So the two recall figures differ a little: SARD val is 0.908 in `scores.md` and 0.934 at conf 0.25. Neither is wrong; they use different thresholds.
+
+**Why AP50-95 is much lower than AP50 here.** At small sizes a tiny shift breaks the IoU. For a 10 px person, a box shifted by 1 px on both axes has IoU 0.68, and by 2 px 0.47, which already fails the 0.5 level. For a 50 px person the same 2 px shift still has IoU 0.85. Reaching IoU 0.9 on a 10 px person needs an error under half a pixel, which is finer than hand-labelling and the model can be. Labelling style adds to it: boxes vary in how tight they are, and RGBTDronePerson's `crowd` boxes cover several people.
+
+The gap follows the person size:
+
+| Dataset | Typical person | AP50 | AP50-95 | AP50-95 ÷ AP50 |
+| --- | --- | --- | --- | --- |
+| SARD (RGB) | about 50 px | 0.952 | 0.644 | 0.68 |
+| NII-CU-MAPD thermal | 12 to 24 px | 0.986 | 0.631 | 0.64 |
+| RGBTDronePerson thermal | about 11 px | 0.584 | 0.197 | 0.34 |
+
+A low AP50-95 therefore doesn't mean the detector is bad. A 2 px box error on a 10 px person is about a fifth of the person's height, which doesn't change where the operator looks. Judge the models by recall and AP50, and watch AP50-95 only to see whether a change made the boxes looser.
+
+Rough guide for this project, not a standard: AP50 above 0.9 is strong, 0.7 to 0.9 usable, below 0.5 poor. Recall for 10 px people matters most, and the target score gets set from the held-out tests ([TODO.md](../../TODO.md#research)).
+
 ### YOLO26n RGB
 
 Trained 100 epochs on SARD + NII-CU-MAPD RGB (6,694 images), about 35 s an epoch on the RTX 5080. `best.pt` is from epoch 68; val AP50 levelled off around epoch 50 and AP50-95 kept rising slightly to the end. AP50, AP50-95, P and R from `train.py` (ultralytics validation); recall at conf 0.25 and by size from `eval_sizes.py`, imgsz 640, no tiling.

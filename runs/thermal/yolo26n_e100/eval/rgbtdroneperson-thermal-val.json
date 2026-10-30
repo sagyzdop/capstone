@@ -1,0 +1,42 @@
+[
+ {
+  "imgsz": 640,
+  "tile": 0,
+  "iou": 0.5,
+  "images": 1225,
+  "persons": 14460,
+  "ap": 0.588,
+  "precision": 0.664,
+  "recall": 0.583,
+  "recall_by_size": {
+   "0-8": {
+    "n": 501,
+    "recall": 0.317
+   },
+   "8-12": {
+    "n": 7850,
+    "recall": 0.597
+   },
+   "12-16": {
+    "n": 4581,
+    "recall": 0.635
+   },
+   "16-24": {
+    "n": 1406,
+    "recall": 0.445
+   },
+   "24-32": {
+    "n": 88,
+    "recall": 0.386
+   },
+   "32-64": {
+    "n": 34,
+    "recall": 0.382
+   }
+  },
+  "ms_per_image_median": 3.9,
+  "model": "best.pt",
+  "dataset": "rgbtdroneperson-thermal",
+  "split": "val"
+ }
+]

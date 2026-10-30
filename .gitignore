@@ -19,6 +19,12 @@ paper/*.synctex.gz
 # os
 .DS_Store
 
-# training outputs
-runs/
+# training outputs: keep each run's small result files, not weights, plots or logs
+runs/*.log
+runs/*/*/*
+!runs/*/*/scores.md
+!runs/*/*/results.csv
+!runs/*/*/results.png
+!runs/*/*/args.yaml
+!runs/*/*/eval/
 *.pt
