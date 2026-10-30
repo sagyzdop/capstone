@@ -1,6 +1,6 @@
 """Train one YOLO26 model per modality on the datasets SPEC.md lists, then score best.pt on each dataset.
 
-rgb:     SARD + NII-CU-MAPD RGB
+rgb:     SARD + NII-CU-MAPD RGB + HERIDAL (location split; runs before 2026-10-30 had no HERIDAL)
 thermal: RGBTDronePerson thermal + NII-CU-MAPD thermal + HIT-UAV
 
 Needs the datasets in data/yolo/ (see research/datasets/README.md#conversion-and-training). Writes
@@ -9,7 +9,7 @@ AP50, AP50-95, precision and recall on every split of every dataset, plus all va
 Re-running resumes an interrupted run from last.pt, and only rescores a finished one.
 
 Usage:
-    python src/detection/train.py rgb thermal [--model yolo26n.pt] [--epochs 100] [--batch 32]
+    python src/detection/train.py rgb thermal [--model yolo26n.pt] [--epochs 100] [--batch 32] [--tag heridal]
 """
 
 import argparse
@@ -22,7 +22,7 @@ from ultralytics import YOLO
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data" / "yolo"
 DATASETS = {
-    "rgb": ["sard", "nii-cu-mapd-rgb"],
+    "rgb": ["sard", "nii-cu-mapd-rgb", "heridal"],
     "thermal": ["rgbtdroneperson-thermal", "nii-cu-mapd-thermal", "hit-uav"],
 }
 
@@ -65,10 +65,11 @@ def main():
     ap.add_argument("--model", default="yolo26n.pt")
     ap.add_argument("--epochs", type=int, default=100)
     ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--tag", default="", help="appended to the run name, e.g. the data change")
     args = ap.parse_args()
 
     for mod in args.modality:
-        run = REPO / "runs" / mod / f"{Path(args.model).stem}_e{args.epochs}"
+        run = REPO / "runs" / mod / "_".join(filter(None, [Path(args.model).stem, f"e{args.epochs}", args.tag]))
         data = combined_yaml(mod)
         csv, last = run / "results.csv", run / "weights" / "last.pt"
         if not (csv.exists() and len(pd.read_csv(csv)) >= args.epochs):
