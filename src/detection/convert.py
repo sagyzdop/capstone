@@ -7,12 +7,13 @@ rgbtdroneperson: thermal only (its labels are drawn on thermal and misaligned on
                  become `person`; `uncertain` regions are filled grey (masked), since they are neither person
                  nor background. Image size comes from the image, not the XML (three XMLs are wrong).
                  Writes data/yolo/rgbtdroneperson-thermal.
-heridal:         the Roboflow v4 COCO export, a test set only. Roboflow stretched the 4:3 frames to 640x640, so each
-                 frame is resized back to 853x640 (people 25% too narrow otherwise). All boxes are `human` (id 1).
+heridal:         the Roboflow v4 COCO export. Roboflow stretched the 4:3 frames to 640x640, so each frame is
+                 resized back to 853x640 (people 25% too narrow otherwise). All boxes are `human` (id 1).
+                 Roboflow's split leaks, so it is ignored and frames are split by location code (HERIDAL_SPLIT).
                  Consecutive frames often show the same ground, so frames are grouped by near-duplicate dHash
-                 (16x16, Hamming <= 40, single linkage). Splits: `unique` keeps the first frame of each group over
-                 all of train/valid/test (we never train on HERIDAL, so its leaky split doesn't matter); `test` is
-                 Roboflow's test split, for comparison with published numbers. Writes data/yolo/heridal.
+                 (16x16, Hamming <= 40, single linkage); val and test keep one frame per group and drop any frame
+                 whose group reaches train. Train and val are cut into two overlapping 640x640 crops; test stays
+                 whole for tiled scoring. Writes data/yolo/heridal.
 
 Images are symlinked, except masked RGBTDronePerson frames (written as PNG) and HERIDAL frames (JPEG, un-stretched).
 
@@ -36,6 +37,14 @@ PERSON = {"person", "rider", "crowd"}
 MASK = {"uncertain"}
 FILL = 114  # ultralytics' letterbox grey
 HERIDAL_SIZE = (853, 640)  # 4:3, as shot
+# Split by location code, so val and test show places the model never trained on. MOB and GRO are the same
+# scenes as BLA and GOR, so they stay with them. Test covers scene types train lacks: maquis, dark pine,
+# riverbank, autumn forest, meadow, ravine.
+HERIDAL_SPLIT = {
+    **dict.fromkeys(["VRD", "GOR", "GRO", "JAS", "BRK", "ZRI", "TRS", "BLA", "MOB"], "train"),
+    **dict.fromkeys(["RAK", "BRS"], "val"),
+    **dict.fromkeys(["MED", "BRA", "CAP", "SB", "BLI", "CAB"], "test"),
+}
 DHASH_THR = 40  # Hamming distance; near-duplicates sit at 0-35, unrelated frames at 85-105
 
 
@@ -131,32 +140,48 @@ def view_groups(hashes):
 
 def heridal(src):
     dst = ROOT / "heridal"
-    frames = []  # (split, img path, xyxy boxes in 640x640 px)
+    W, H = HERIDAL_SIZE
+    frames = []  # (location, img path, xyxy boxes in un-stretched px)
     for split in ["train", "valid", "test"]:
         d = json.loads((src / split / "_annotations.coco.json").read_text())
         boxes = {im["id"]: [] for im in d["images"]}
         for a in d["annotations"]:
             assert a["category_id"] == 1, a
             x, y, w, h = a["bbox"]
-            boxes[a["image_id"]].append([x, y, x + w, y + h])
-        frames += [(split, src / split / im["file_name"], boxes[im["id"]]) for im in sorted(d["images"], key=lambda im: im["file_name"])]
+            boxes[a["image_id"]].append([x * W / 640, y * H / 640, (x + w) * W / 640, (y + h) * H / 640])
+        for im in d["images"]:
+            frames.append((im["file_name"].split("_")[1], src / split / im["file_name"], boxes[im["id"]]))
+    frames.sort(key=lambda f: f[1].name)
+    assert {f[0] for f in frames} <= set(HERIDAL_SPLIT), {f[0] for f in frames} - set(HERIDAL_SPLIT)
     group = view_groups([dhash(img) for _, img, _ in frames])
+    train_groups = {g for f, g in zip(frames, group) if HERIDAL_SPLIT[f[0]] == "train"}
     seen = set()
-    for out in ["unique", "test"]:
-        n_img = n_person = n_empty = 0
-        for (split, img, boxes), g in zip(frames, group):
-            if out == "test" and split != "test" or out == "unique" and g in seen:
-                continue
-            seen.add(g)
-            # normalised boxes survive the un-stretch unchanged
-            rows = yolo_rows(boxes, 640, 640)
-            write(dst, out, img, rows, cv2.resize(cv2.imread(str(img)), HERIDAL_SIZE, interpolation=cv2.INTER_CUBIC), ".jpg")
-            n_img += 1
-            n_person += len(rows)
-            n_empty += not rows
-        print(f"heridal {out}: {n_img} images, {n_person} persons, {n_empty} empty")
-    print(f"{len(frames)} frames in {len(set(group))} view groups")
-    write_yaml("heridal", ["unique", "test"])
+    n = {s: [0, 0, 0, 0] for s in ["train", "val", "test"]}  # images, persons, empty, dropped as twin of another split
+    for (loc, img, boxes), g in zip(frames, group):
+        split = HERIDAL_SPLIT[loc]
+        if split != "train" and (g in seen or g in train_groups):  # one frame per view; none seen in training
+            n[split][3] += g in train_groups
+            continue
+        seen.add(g)
+        image = cv2.resize(cv2.imread(str(img)), HERIDAL_SIZE, interpolation=cv2.INTER_CUBIC)
+        if split == "test":  # whole frames: eval_sizes.py --tile 640 tiles them as the drone will
+            crops = [(0, image, img, boxes)]
+        else:  # two overlapping 640 crops, so people keep their native size at imgsz 640
+            crops = []
+            for x0 in [0, W - H]:
+                # keep boxes with at least half their area inside the crop
+                keep = [b for b in boxes if (min(b[2], x0 + H) - max(b[0], x0)) >= (b[2] - b[0]) / 2]
+                crops.append((x0, image[:, x0:x0 + H], Path(f"{img.stem}_x{x0}.jpg"), [[b[0] - x0, b[1], b[2] - x0, b[3]] for b in keep]))
+        for x0, im, name, bx in crops:
+            rows = yolo_rows(bx, im.shape[1], im.shape[0])
+            write(dst, split, name, rows, im, ".jpg")
+            n[split][0] += 1
+            n[split][1] += len(rows)
+            n[split][2] += not rows
+    for split, (i, pers, empty, twins) in n.items():
+        locs = ", ".join(k for k, v in HERIDAL_SPLIT.items() if v == split)
+        print(f"heridal {split} ({locs}): {i} images, {pers} persons, {empty} empty, {twins} dropped as twins of train")
+    write_yaml("heridal", ["train", "val", "test"])
 
 
 def main():
