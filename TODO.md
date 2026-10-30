@@ -5,7 +5,10 @@ Start here. Tick a line when it's done, and delete it once nobody needs to see i
 ## In the lab
 
 - [x] Conversion and training scripts are in `src/detection/` (`convert.py`, `train.py`); commands, settings, SARD details and the NII-CU-MAPD variant are in [research/datasets/README.md](research/datasets/README.md#conversion-and-training).
-- [ ] Train YOLO26n on the lab computer (`python src/detection/train.py rgb thermal --epochs 100`) and fill the own-val column of the [results table](research/datasets/README.md#results) from `runs/*/yolo26n_e100/scores.md`.
+- [x] Train YOLO26n RGB and fill its own-val results ([results](research/datasets/README.md#yolo26n-rgb)).
+- [x] Train YOLO26n thermal and fill its own-val results ([results](research/datasets/README.md#yolo26n-thermal)).
+- [ ] Retrain YOLO26n thermal for 30 to 50 epochs (or with early stopping): val AP50 peaked at epoch 28 and fell after.
+- [ ] Score both models on WiSARD and HERIDAL (download the WiSARD sample again; it was only kept in the dropped npz format).
 - [x] Check whether the RGB model saw RGBTDronePerson's RGB images. The first one did, and scored AP50 0.06 on them; `train.py` now trains RGB without them ([why](research/datasets/README.md#rgbtdroneperson)).
 - [ ] Test on data the models never trained on: convert WiSARD and HERIDAL with `src/detection/prepare.py`, run `src/detection/eval_sizes.py`, fill the results table. For HERIDAL, use the 57 test images without a train twin.
 - [ ] Run the laptop test, nano then small ([steps](research/datasets/README.md#test-on-the-station-laptop)). Replace the predicted 30 / 10 FPS in [SPEC.md](SPEC.md#streams) with what you measure.

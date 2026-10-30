@@ -100,12 +100,64 @@ Settings: YOLO26n from COCO weights, `imgsz=640`, 100 epochs with no early stopp
 
 | Model | Modality | Own val | WiSARD | HERIDAL |
 | --- | --- | --- | --- | --- |
-| YOLO26n | RGB | TBD | TBD | TBD |
-| YOLO26n | Thermal | TBD | TBD | n/a (RGB only) |
+| YOLO26n | RGB | AP50 0.907, recall 0.85 ([below](#yolo26n-rgb)) | TBD | TBD |
+| YOLO26n | Thermal | AP50 0.650, recall 0.62 ([below](#yolo26n-thermal)) | TBD | n/a (RGB only) |
 | YOLO26s | RGB | TBD | TBD | TBD |
 | YOLO26s | Thermal | TBD | TBD | n/a |
 
 Report AP50, recall at confidence 0.25, and recall for persons under 16 px. `src/detection/eval_sizes.py` does all three, with and without tiling. Weights: `runs/{rgb,thermal}/yolo26n_e100/weights/best.pt` on the lab computer (git-ignored), with `scores.md` next to them.
+
+### YOLO26n RGB
+
+Trained 100 epochs on SARD + NII-CU-MAPD RGB (6,694 images), about 35 s an epoch on the RTX 5080. `best.pt` is from epoch 68; val AP50 levelled off around epoch 50 and AP50-95 kept rising slightly to the end. AP50, AP50-95, P and R from `train.py` (ultralytics validation); recall at conf 0.25 and by size from `eval_sizes.py`, imgsz 640, no tiling.
+
+| Data | Split | AP50 | AP50-95 | Precision | Recall | Recall at conf 0.25 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Both val sets | val | 0.907 | 0.550 | 0.948 | 0.854 | |
+| SARD | val | 0.952 | 0.644 | 0.971 | 0.908 | 0.934 |
+| SARD | test | 0.945 | 0.644 | 0.962 | 0.902 | 0.932 |
+| NII-CU-MAPD RGB | val | 0.834 | 0.379 | 0.898 | 0.774 | 0.780 |
+
+Recall by person size at the model input (native size × 640 / long side), conf 0.25:
+
+| Data | Under 16 px | 16 to 24 px | 24 to 32 px | Over 32 px |
+| --- | --- | --- | --- | --- |
+| NII-CU-MAPD RGB val (shrunk 4.2×) | 0.80 (424 people, 8 to 15 px) | 0.77 (467 people, over 15 px) | | |
+| SARD val | 0.00 (16 people) | 0.50 (46) | 0.84 (146) | 0.97 (1,255) |
+| SARD test | 0.13 (8 people) | 0.64 (28) | 0.84 (80) | 0.97 (616) |
+
+- NII-CU-MAPD is the only set with people at the drone's size (about 10 px). Recall there is about 0.8 at 8 to 15 px, so the drone's RGB tiles should work, if the scenes transfer.
+- SARD's people are mostly over 32 px, so its 0.95 says little about the drone. Below 24 px it misses half or more, on few examples. It fits the robot's close-range view.
+- These are the training datasets' own splits, from the same flights as train. The held-out WiSARD and HERIDAL scores are the real test.
+- Raw output: `runs/rgb/yolo26n_e100/scores.md` and `runs/rgb/yolo26n_e100/eval/*.json` on the lab computer.
+
+### YOLO26n thermal
+
+Trained 100 epochs on RGBTDronePerson + NII-CU-MAPD + HIT-UAV thermal (9,561 images). `best.pt` is from epoch 28 (val AP50 0.647); after that val AP50 slowly fell to 0.605 at epoch 100 while training loss kept dropping, so the model overfits after about epoch 30. Next run: 30 to 50 epochs, or early stopping. Same measures as RGB; thermal images are 640 px wide, so native size is the size at the model input.
+
+| Data | Split | AP50 | AP50-95 | Precision | Recall | Recall at conf 0.25 |
+| --- | --- | --- | --- | --- | --- | --- |
+| All three val sets | val | 0.650 | 0.257 | 0.703 | 0.623 | |
+| RGBTDronePerson | val | 0.584 | 0.197 | 0.655 | 0.594 | 0.583 |
+| NII-CU-MAPD thermal | val | 0.986 | 0.631 | 0.980 | 0.957 | 0.971 |
+| HIT-UAV | val | 0.911 | 0.492 | 0.901 | 0.857 | 0.898 |
+| HIT-UAV | test | 0.921 | 0.493 | 0.893 | 0.864 | 0.905 |
+
+Recall by person size, conf 0.25:
+
+| Data | Under 8 px | 8 to 12 px | 12 to 16 px | 16 to 24 px | Over 24 px |
+| --- | --- | --- | --- | --- | --- |
+| RGBTDronePerson val | 0.32 (501) | 0.60 (7,850) | 0.64 (4,581) | 0.45 (1,406) | 0.39 (122) |
+| NII-CU-MAPD thermal val | | 0.67 (36) | 0.97 (335) | 0.99 (413) | 1.00 (107) |
+| HIT-UAV val | 0.60 (5) | 0.84 (230) | 0.91 (476) | 0.94 (398) | 0.83 (59) |
+| HIT-UAV test | 0.75 (16) | 0.88 (548) | 0.91 (1,045) | 0.92 (858) | 0.89 (144) |
+
+- At the drone's size, about 10 px, recall is 0.84 to 0.88 on HIT-UAV and 0.60 on RGBTDronePerson.
+- RGBTDronePerson is the hard set and pulls the combined score down: tiny people in dense street scenes, day and night. Its recall drops for boxes over 16 px, likely because those are mostly `crowd` boxes (several people in one box), which are hard to match at IoU 0.5.
+- NII-CU-MAPD (0.986) is nearly solved: one field, people standing apart in the open.
+- HIT-UAV scores are optimistic: 31% of its val/test images are near-duplicates of train.
+- As for RGB, these are the training datasets' own splits. The held-out WiSARD thermal score is the real test; an earlier HIT-UAV-only model scored 0.87 on HIT-UAV test and 0.01 on WiSARD.
+- Raw output: `runs/thermal/yolo26n_e100/scores.md` and `runs/thermal/yolo26n_e100/eval/*.json` on the lab computer.
 
 ## Test on the station laptop
 
