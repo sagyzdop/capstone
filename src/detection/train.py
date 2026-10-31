@@ -1,6 +1,7 @@
 """Train one YOLO26 model per modality on the datasets SPEC.md lists, then score best.pt on each dataset.
 
-rgb:     SARD + NII-CU-MAPD RGB + HERIDAL (location split; runs before 2026-10-30 had no HERIDAL)
+rgb:     SARD + NII-CU-MAPD RGB + HERIDAL + NOMAD (HERIDAL split by location, NOMAD by actor; runs before 2026-10-30
+         had no HERIDAL, runs before 2026-10-31 no NOMAD)
 thermal: RGBTDronePerson thermal + NII-CU-MAPD thermal + HIT-UAV
 
 With one modality, --data, --repeat and --val change the mix: train on a subset, list a dataset's train split
@@ -30,7 +31,7 @@ import report
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data" / "yolo"
 DATASETS = {
-    "rgb": ["sard", "nii-cu-mapd-rgb", "heridal"],
+    "rgb": ["sard", "nii-cu-mapd-rgb", "heridal", "nomad"],
     "thermal": ["rgbtdroneperson-thermal", "nii-cu-mapd-thermal", "hit-uav"],
 }
 
@@ -79,6 +80,7 @@ def main():
     ap.add_argument("--repeat", nargs="+", default=[], metavar="NAME=K", help="list NAME's train split K times")
     ap.add_argument("--val", nargs="+", help="pick best.pt on these val splits only (default: the training datasets)")
     ap.add_argument("--scale", type=float, default=0.5, help="random rescale range, ultralytics' `scale`")
+    ap.add_argument("--workers", type=int, default=8, help="dataloader processes; fewer use less RAM")
     args = ap.parse_args()
     assert len(args.modality) == 1 or not (args.data or args.repeat or args.val), "--data/--repeat/--val need one modality"
     repeat = {n: int(k) for n, k in (r.split("=") for r in args.repeat)}
@@ -93,7 +95,7 @@ def main():
                 YOLO(last).train(resume=True)
             else:  # patience = epochs: always run the full schedule
                 YOLO(args.model).train(data=str(data), imgsz=640, epochs=args.epochs, patience=args.epochs,
-                                       batch=args.batch, scale=args.scale, cache=False, workers=8, seed=0,
+                                       batch=args.batch, scale=args.scale, cache=False, workers=args.workers, seed=0,
                                        project=str(run.parent), name=run.name, exist_ok=True)
         score(run / "weights" / "best.pt", mod, run)
         report.write(run)

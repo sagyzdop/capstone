@@ -11,6 +11,7 @@ Every dataset is converted to one class, `person`, and trained at `imgsz=640`. D
 | [SARD](https://www.kaggle.com/datasets/nikolasgegenava/sard-search-and-rescue) (Kaggle copy; the [IEEE DataPort original](https://ieee-dataport.org/documents/search-and-rescue-image-dataset-person-detection-sard) needs a paid subscription) | RGB | Actors in search-and-rescue poses, including lying | Not stated |
 | [NII-CU-MAPD](https://www.nii-cu-multispectral.org/) | RGB and thermal | 5,880 aligned pairs from a drone at 20 to 50 m over a baseball field in Chiba, Japan, January 2020 | CC BY-NC-SA 3.0 |
 | [HERIDAL](https://universe.roboflow.com/drone-internship/heridal-human-detection) (Roboflow export v4) | RGB | Real SAR exercises in Croatian karst, forest, maquis, snow and a city park; volunteers stand, walk, sit and lie | CC BY 4.0 |
+| [NOMAD](https://github.com/ArtRuss/NOMAD) (30 m subset, `a30`) | RGB | 100 actors walking, lying and hiding (under trees, in a truck bed, by buildings), frames from 5.4K drone video | Not stated |
 | [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal | 6,125 pairs of tiny people in streets, campuses, parks and piers, day and night, top-down and oblique | Not verified |
 | [HIT-UAV](https://zenodo.org/record/7633134) | Thermal | 2,898 images at 640×512 from 60 to 130 m over a campus and roads, day and night | CC0 on Zenodo; GitHub says CC BY 4.0 |
 
@@ -84,6 +85,22 @@ The RGB test that counts is HERIDAL's six held-out locations, above. Thermal has
 
 WiSARD (real wilderness SAR, RGB and thermal) is out of scope for now. We had a 264-frame sample of one flight and four volunteers, which is too narrow for more than a sanity check.
 
+### NOMAD
+
+We have the 30 m subset (`a30`): 8,580 frames at 5472×3078 from 99 actors (Actor072 has labels but no images), one actor per frame, plus 100 frames with nobody in them. People are 13 to 118 px tall in the native frame (5th to 95th percentile), because each flight changes height and many actors are half hidden. `convert.py nomad` does the following:
+
+- Splits by actor, since an actor's frames come from one video: ids ending in 0 go to test, ending in 5 to val, the other 79 to train.
+- Shrinks every frame to 1280 px wide, the drone's RGB stream ([SPEC.md](../../SPEC.md#streams)). People come out at a median 17 px, what the drone sees at about 30 m. Train frames are also shrunk to 2560 px (median 33 px), for lower flights.
+- Train and val keep one 640×640 crop per frame and width, placed at random around the actor (a random crop for empty frames). Test frames stay whole at 1280×720 and are scored tiled, the way the station will run them.
+
+| Split | Actors | Images | Persons | Empty |
+| --- | --- | --- | --- | --- |
+| train | 79 | 13,720 crops (6,860 frames at two widths) | 13,519 | 201 |
+| val | 10 (ending in 5) | 860 crops | 846 | 14 |
+| test | 10 (ending in 0) | 860 frames at 1280×720 | 846 (24% under 8 px) | 14 |
+
+The license isn't stated on the GitHub page; check it before publishing anything trained on NOMAD.
+
 ## Conversion and training
 
 Raw datasets go in `data/raw/`, unpacked as downloaded. Each is converted to single-class `person` YOLO under `data/yolo/`, with images symlinked to `data/raw/` (HERIDAL's resized frames and crops, and RGBTDronePerson's masked frames, are written out instead):
@@ -94,6 +111,7 @@ R=data/raw/hit-uav; python src/detection/prepare.py hit-uav --person-ids 0 --spl
 python src/detection/convert.py nii-cu-mapd data/raw/nii-cu-mapd/4-channel
 python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson
 python src/detection/convert.py heridal data/raw/heridal
+python src/detection/convert.py nomad data/raw/nomad
 ```
 
 Train under a memory cap; caching images in RAM once ran the 30 GB lab computer out of memory, so `train.py` doesn't cache:
@@ -102,13 +120,15 @@ Train under a memory cap; caching images in RAM once ran the 30 GB lab computer 
 systemd-inhibit --what=sleep:idle --why=train systemd-run --user --scope -p MemoryMax=18G -p MemorySwapMax=0 .venv/bin/python src/detection/train.py rgb --model yolo26n.pt --epochs 60 --tag heridal
 ```
 
+With NOMAD in the RGB mix (22,594 train images) and a browser open, 8 dataloader workers ran the machine out of memory; `--workers 4` peaks at about 5 GB of process memory, and the run fits under `MemoryMax=12G`.
+
 `train.py` trains one model per modality on all its datasets, scores `best.pt` on every val and test split into `scores.md`, and writes `results.md`. `--tag` is added to the run folder name for runs that differ in data. A run that gets interrupted resumes when the same command runs again. Then score the held-out test tiled:
 
 ```
 python src/detection/eval_sizes.py runs/rgb/RUN/weights/best.pt heridal test --imgsz 640 --tile 640 --device 0 --out runs/rgb/RUN/eval/heridal-test.json
 ```
 
-Settings: YOLO26 from COCO weights, `imgsz=640`, batch 32, seed 0, no early stopping, Ultralytics' default augmentation. Each model's val set is all its datasets' val splits together, and that picks `best.pt` (mostly by AP50-95). The lab computer has an RTX 5080 (16 GB); an RGB epoch takes about 25 s.
+Settings: YOLO26 from COCO weights, `imgsz=640`, batch 32, seed 0, no early stopping, Ultralytics' default augmentation. Each model's val set is all its datasets' val splits together, and that picks `best.pt` (mostly by AP50-95). The lab computer has an RTX 5080 (16 GB); an RGB epoch takes about 25 s, or about 60 s with NOMAD.
 
 ## Test on the station laptop
 
@@ -244,31 +264,35 @@ Each run folder has a `results.md` with its setup, val curve, the epoch `best.pt
 | [RGB YOLO26n](../../runs/rgb/yolo26n_e100/results.md) | SARD, NII-CU-MAPD | 100 (68) | 0.907 | 0.015 / 0.02 |
 | [RGB YOLO26s](../../runs/rgb/yolo26s_e70/results.md) | SARD, NII-CU-MAPD | 70 (55) | 0.889 | 0.009 / 0.03 |
 | [RGB YOLO26n + HERIDAL](../../runs/rgb/yolo26n_e60_heridal/results.md) | SARD, NII-CU-MAPD, HERIDAL train locations | 60 (52) | 0.862 (HERIDAL val included) | 0.215 / 0.22 |
+| [RGB YOLO26n + HERIDAL + NOMAD](../../runs/rgb/yolo26n_e60_nomad/results.md) (`best2.pt`) | SARD, NII-CU-MAPD, HERIDAL train locations, NOMAD train actors | 60 (60) | 0.754 (NOMAD val included) | 0.192 / 0.19 |
 | [RGB YOLO26n + HERIDAL ×3](../../runs/rgb/yolo26n_e60_heridalx3_valh_s025/results.md) | Same, HERIDAL listed 3×; `best.pt` picked on HERIDAL val; rescale ±25% | 60 (11) | 0.242 (HERIDAL val only) | 0.166 / 0.17 (`last.pt` 0.122 / 0.14) |
 | [RGB YOLO26n, HERIDAL only](../../runs/rgb/yolo26n_e100_heridal_only/results.md) | HERIDAL train locations | 100 (76) | 0.246 (HERIDAL val only) | 0.195 / 0.20 (`last.pt` 0.184 / 0.19) |
 | [Thermal YOLO26n](../../runs/thermal/yolo26n_e100/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 100 (28) | 0.650 | n/a |
 | [Thermal YOLO26s](../../runs/thermal/yolo26s_e50/results.md) | RGBTDronePerson, NII-CU-MAPD, HIT-UAV | 50 (28) | 0.666 | n/a |
 
-The current RGB model is YOLO26n + HERIDAL (`yolo26n_e60_heridal`), and the current thermal model is YOLO26n (`yolo26n_e100`).
+The current RGB model is YOLO26n + HERIDAL + NOMAD (`yolo26n_e60_nomad`, copied to `best2.pt` in the repo root), and the current thermal model is YOLO26n (`yolo26n_e100`).
 
 ### Per dataset
 
 AP50 from `scores.md`. RGB rows without a split note are from the training sets' own val/test splits, which share flights or photos with train.
 
-| Data | Split | RGB n | RGB s | RGB n + HERIDAL | Thermal n | Thermal s |
-| --- | --- | --- | --- | --- | --- | --- |
-| SARD | val | 0.952 | 0.948 | 0.945 | | |
-| SARD | test | 0.945 | 0.946 | 0.941 | | |
-| NII-CU-MAPD RGB | val | 0.834 | 0.788 | 0.848 | | |
-| HERIDAL | val (unseen locations) | | | 0.220 | | |
-| HERIDAL | test (unseen locations), whole frames | 0.011 | 0.006 | 0.152 | | |
-| HERIDAL | test (unseen locations), tiled | 0.015 | 0.009 | 0.215 | | |
-| RGBTDronePerson | val | | | | 0.584 | 0.602 |
-| NII-CU-MAPD thermal | val | | | | 0.986 | 0.977 |
-| HIT-UAV | val | | | | 0.911 | 0.914 |
-| HIT-UAV | test | | | | 0.921 | 0.934 |
+| Data | Split | RGB n | RGB s | RGB n + HERIDAL | RGB n + HERIDAL + NOMAD | Thermal n | Thermal s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SARD | val | 0.952 | 0.948 | 0.945 | 0.941 | | |
+| SARD | test | 0.945 | 0.946 | 0.941 | 0.943 | | |
+| NII-CU-MAPD RGB | val | 0.834 | 0.788 | 0.848 | 0.856 | | |
+| HERIDAL | val (unseen locations) | | | 0.220 | 0.183 | | |
+| HERIDAL | test (unseen locations), whole frames | 0.011 | 0.006 | 0.152 | 0.168 | | |
+| HERIDAL | test (unseen locations), tiled | 0.015 | 0.009 | 0.215 | 0.192 | | |
+| NOMAD | val (unseen actors), crops | | | | 0.404 | | |
+| NOMAD | test (unseen actors), whole 1280×720 frames | | | 0.018 | 0.145 | | |
+| NOMAD | test (unseen actors), tiled | | | 0.086 | 0.300 | | |
+| RGBTDronePerson | val | | | | | 0.584 | 0.602 |
+| NII-CU-MAPD thermal | val | | | | | 0.986 | 0.977 |
+| HIT-UAV | val | | | | | 0.911 | 0.914 |
+| HIT-UAV | test | | | | | 0.921 | 0.934 |
 
-HERIDAL rows are from `eval_sizes.py`, except val, which is Ultralytics.
+HERIDAL and NOMAD test rows are from `eval_sizes.py`; val rows are Ultralytics.
 
 The two HERIDAL experiments, against the current RGB model:
 
@@ -288,6 +312,9 @@ Recall at confidence 0.25 by person size, on the sets with people at the drone's
 | HERIDAL test, tiled | RGB n | 0.00 (49) | 0.00 (210) | 0.01 (195) | 0.08 (119) |
 | HERIDAL test, tiled | RGB n + HERIDAL | 0.22 (49) | 0.18 (210) | 0.26 (195) | 0.23 (119) |
 | HERIDAL test, tiled | RGB n, HERIDAL only | 0.10 (49) | 0.15 (210) | 0.24 (195) | 0.24 (119) |
+| HERIDAL test, tiled | RGB n + HERIDAL + NOMAD | 0.10 (49) | 0.12 (210) | 0.25 (195) | 0.23 (119) |
+| NOMAD test, tiled | RGB n + HERIDAL | 0.00 (201) | 0.10 (194) | 0.23 (219) | 0.21 (228) |
+| NOMAD test, tiled | RGB n + HERIDAL + NOMAD | 0.01 (201) | 0.23 (194) | 0.43 (219) | 0.60 (228) |
 | RGBTDronePerson val | Thermal n | 0.32 (501) | 0.60 (7,850) | 0.64 (4,581) | 0.45 (1,406) |
 | HIT-UAV test | Thermal n | 0.75 (16) | 0.88 (548) | 0.91 (1,045) | 0.92 (858) |
 | NII-CU-MAPD thermal val | Thermal n | | 0.67 (36) | 0.97 (335) | 0.99 (413) |
@@ -299,6 +326,8 @@ The bracket is the number of people in the bin. On NII-CU-MAPD RGB val, where pe
 High scores on a dataset's own splits say little about new places. Both RGB models trained on SARD and NII-CU-MAPD scored above 0.9 AP50 on SARD and then found 2 to 3% of the people at HERIDAL's held-out locations, at 8 to 16 px almost none, tiled or not. It wasn't the conversion: the labels sit on the people, the models skipped people standing in plain view on open grass, and recall at IoU 0.25 was still 0.03. SARD's people are mostly over 32 px, and NII-CU-MAPD's small people are all on one baseball field in winter, so neither showed the models a 10 px person in natural terrain. An earlier thermal model trained on HIT-UAV did the same on WiSARD (AP50 0.87 on its own test, 0.01 on WiSARD).
 
 Adding HERIDAL's training locations raised AP50 on its unseen locations from 0.015 to 0.215 and tiled recall from 0.02 to 0.22, about the same at every size from under 8 px to 24 px. SARD stayed level (0.952 to 0.945) and NII-CU-MAPD rose (0.834 to 0.848). The model still misses about 78% of HERIDAL's people, and HERIDAL val (0.22, two other unseen locations) is no better, so the gap isn't down to which locations went into test. The combined val AP50 fell to 0.862 only because HERIDAL val is now part of it.
+
+Adding NOMAD's training actors more than tripled tiled AP50 on its unseen actors, from 0.086 to 0.300, and doubled recall from 0.14 to 0.33 at precision 0.56. At 16 to 24 px recall went from 0.21 to 0.60, at 12 to 16 px from 0.23 to 0.43; under 8 px (a quarter of NOMAD test) it stays near zero. SARD (0.943) and NII-CU-MAPD (0.856) held. HERIDAL test fell a little, from 0.215 to 0.192 AP50 and from 0.22 to 0.19 recall; with 582 people that is about at the edge of sampling noise (±0.02), and HERIDAL whole frames rose (0.152 to 0.168), so NOMAD neither helps nor clearly hurts HERIDAL's terrain. NOMAD's actors are at five US sites in summer; HERIDAL's are Croatian karst and forest. `best.pt` came from the last epoch, so a longer run may still gain.
 
 Tiling helps on HERIDAL: 0.215 tiled against 0.152 on whole frames, since whole 853×640 frames shrink to 640 and people shrink with them.
 
@@ -320,17 +349,17 @@ Thermal is good on HIT-UAV and NII-CU-MAPD (recall 0.88 to 0.97 at 8 to 16 px) a
 
 Neither model is ready for a real search. Both are good on the data they trained on and unproven or weak anywhere else.
 
-The RGB model to use is YOLO26n + HERIDAL (`runs/rgb/yolo26n_e60_heridal`), run on 640 tiles. At locations it has never seen it finds about 22% of people in a single frame (30% if a rough box is enough), with about half its boxes correct at confidence 0.25. It keeps SARD (0.945) and NII-CU-MAPD (0.848) where they were. For an operator that's an aid that sometimes points at a person, not a detector to rely on. A hovering drone sees each person in many frames, which raises the chance of a hit over time, but misses tend to repeat on the same hard person, so per-frame recall is the honest number.
+The RGB model to use is YOLO26n + HERIDAL + NOMAD (`runs/rgb/yolo26n_e60_nomad`, `best2.pt`), run on 640 tiles. On NOMAD actors it has never seen, in 1280×720 frames like the drone's, it finds 33% of people per frame (60% of those at 16 to 24 px), with 56% of its boxes correct at confidence 0.25. At HERIDAL's unseen locations it finds about 19%, level with the previous model. It keeps SARD (0.943) and NII-CU-MAPD (0.856) where they were. Run without tiling, on frames resized to 640, it scores about half as well on NOMAD (0.145 against 0.300 AP50). For an operator that's an aid that sometimes points at a person, not a detector to rely on. A hovering drone sees each person in many frames, which raises the chance of a hit over time, but misses tend to repeat on the same hard person, so per-frame recall is the honest number.
 
 The thermal model to use is YOLO26n (`runs/thermal/yolo26n_e100`). It finds 88 to 97% of people at the drone's size on HIT-UAV and NII-CU-MAPD and 60% on RGBTDronePerson, but all three are its training sets' own splits. The last time a thermal model met a new site (HIT-UAV model on WiSARD), it fell to near zero, so its real performance is unknown.
 
-What limits both is data, not the model or the training recipe. Neither a 3× larger model nor training on HERIDAL alone nor weighting HERIDAL up beat simply adding HERIDAL to the mix. The one change that moved RGB on unseen terrain was 1,090 frames of people at the drone's size in natural terrain, and those frames now seem used up: with or without the other datasets, HERIDAL takes nano to about 0.2 AP50 and no further.
+What limits both is data, not the model or the training recipe. Neither a 3× larger model nor training on HERIDAL alone nor weighting HERIDAL up beat simply adding HERIDAL to the mix. The one change that moved RGB on unseen terrain was 1,090 frames of people at the drone's size in natural terrain, and those frames now seem used up: with or without the other datasets, HERIDAL takes nano to about 0.2 AP50 and no further. NOMAD did the same for its own actors (0.086 to 0.300) but didn't carry over to HERIDAL's terrain, so each new kind of terrain seems to need its own data.
 
 ## Next steps
 
-In order. Score every RGB run on HERIDAL's test locations, tiled, against 0.215 AP50 and 0.22 recall, and keep picking `best.pt` on the combined val set.
+In order. Score every RGB run on HERIDAL's test locations and NOMAD's test actors, tiled, against 0.192 / 0.19 and 0.300 / 0.33 (AP50 / recall), and keep picking `best.pt` on the combined val set.
 
-1. More RGB data with people at the drone's size in natural terrain, one dataset per run so each one's effect is visible: NOMAD first (check its license), then a capped, re-split C2A sample.
+1. More RGB data with people at the drone's size in natural terrain, one dataset per run so each one's effect is visible: NOMAD is in (check its license); next a capped, re-split C2A sample, or NOMAD's other distances. NOMAD's run peaked at its last epoch, so try 100 epochs too.
 2. Get a held-out thermal test. Without one, nothing says the thermal model works at a new site. WiSARD's thermal frames or AIResQ are the candidates.
 3. Retrain thermal for 30 to 50 epochs; it peaked at epoch 28 in both runs.
 4. If more RGB data still leaves 8 to 12 px recall low, try a P2 (stride-4) head for small objects, and download the HERIDAL original for scale augmentation from sharp frames.

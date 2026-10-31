@@ -14,18 +14,28 @@ heridal:         the Roboflow v4 COCO export. Roboflow stretched the 4:3 frames 
                  (16x16, Hamming <= 40, single linkage); val and test keep one frame per group and drop any frame
                  whose group reaches train. Train and val are cut into two overlapping 640x640 crops; test stays
                  whole for tiled scoring. Writes data/yolo/heridal.
+nomad:           the 30 m subset (`a30`, 5472x3078 frames, one actor each, YOLO labels). Split by actor (ids ending
+                 in 0 test, in 5 val), since an actor's frames come from one video. Each frame is shrunk to the
+                 drone's 1280 px stream width (people at the size the drone sees at about 30 m) and, for train only,
+                 to 2560 px as well (a lower flight). Train and val keep one 640x640 crop per frame and width, placed
+                 at random around the actor (frames without anyone: a random crop); test keeps the whole 1280x720
+                 frame for tiled scoring. Writes data/yolo/nomad.
 
-Images are symlinked, except masked RGBTDronePerson frames (written as PNG) and HERIDAL frames (JPEG, un-stretched).
+Images are symlinked, except masked RGBTDronePerson frames (written as PNG), HERIDAL frames (JPEG, un-stretched) and
+NOMAD crops (JPEG).
 
 Usage:
     python src/detection/convert.py nii-cu-mapd data/raw/nii-cu-mapd/4-channel
     python src/detection/convert.py rgbtdroneperson data/raw/rgbtdroneperson
     python src/detection/convert.py heridal data/raw/heridal
+    python src/detection/convert.py nomad data/raw/nomad
 """
 
 import argparse
 import json
+import random
 import xml.etree.ElementTree as ET
+from multiprocessing import Pool
 from pathlib import Path
 
 import cv2
@@ -46,6 +56,7 @@ HERIDAL_SPLIT = {
     **dict.fromkeys(["MED", "BRA", "CAP", "SB", "BLI", "CAB"], "test"),
 }
 DHASH_THR = 40  # Hamming distance; near-duplicates sit at 0-35, unrelated frames at 85-105
+NOMAD_WIDTHS = {"train": [1280, 2560], "val": [1280], "test": [1280]}  # 1280: the drone's RGB stream
 
 
 def yolo_rows(boxes, W, H):
@@ -184,12 +195,51 @@ def heridal(src):
     write_yaml("heridal", ["train", "val", "test"])
 
 
+def nomad_split(img):
+    actor = int(img.name[5:8])  # ActorNNN_a30_...
+    return "test" if actor % 10 == 0 else "val" if actor % 10 == 5 else "train"
+
+
+def nomad_frame(args):
+    """Write one frame's crops (or the whole frame, for test). Returns (split, images, persons, empty)."""
+    img, lbl = args
+    split, n = nomad_split(img), [0, 0, 0]
+    rows = [list(map(float, r.split()[1:])) for r in lbl.read_text().splitlines() if r.strip()] if lbl else []
+    full = cv2.imread(str(img), cv2.IMREAD_REDUCED_COLOR_2)  # 2736x1539: decodes 4x faster, still above 2560
+    for W in NOMAD_WIDTHS[split]:
+        H = round(W * full.shape[0] / full.shape[1])
+        im = cv2.resize(full, (W, H), interpolation=cv2.INTER_AREA)
+        boxes = [[(cx - w / 2) * W, (cy - h / 2) * H, (cx + w / 2) * W, (cy + h / 2) * H] for cx, cy, w, h in rows]
+        name = Path(f"{img.stem}_w{W}.jpg")
+        if split != "test":  # a 640 crop holding the whole actor, at a random spot seeded by the frame
+            rnd = random.Random(name.stem)
+            x0 = rnd.randint(*(sorted([max(0, int(boxes[0][2]) + 1 - 640), min(int(boxes[0][0]), W - 640)]) if boxes else [0, W - 640]))
+            y0 = rnd.randint(*(sorted([max(0, int(boxes[0][3]) + 1 - 640), min(int(boxes[0][1]), H - 640)]) if boxes else [0, H - 640]))
+            im, boxes = im[y0:y0 + 640, x0:x0 + 640], [[b[0] - x0, b[1] - y0, b[2] - x0, b[3] - y0] for b in boxes]
+        out = yolo_rows(boxes, im.shape[1], im.shape[0])
+        write(ROOT / "nomad", split, name, out, im, ".jpg")
+        n = [n[0] + 1, n[1] + len(out), n[2] + (not out)]
+    return split, *n
+
+
+def nomad(src):
+    labels = {p.stem: p for p in (src / "lables").glob("*/*.txt")}  # sic: the dataset's folder name
+    frames = [(img, labels.get(img.stem)) for img in sorted((src / "Images").glob("*/*.jpg"))]
+    n = {s: [0, 0, 0] for s in NOMAD_WIDTHS}
+    with Pool(12) as pool:
+        for split, *k in pool.imap_unordered(nomad_frame, frames, chunksize=8):
+            n[split] = [a + b for a, b in zip(n[split], k)]
+    for split, (i, pers, empty) in n.items():
+        print(f"nomad {split}: {i} images, {pers} persons, {empty} empty")
+    write_yaml("nomad", ["train", "val", "test"])
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("dataset", choices=["nii-cu-mapd", "rgbtdroneperson", "heridal"])
+    ap.add_argument("dataset", choices=["nii-cu-mapd", "rgbtdroneperson", "heridal", "nomad"])
     ap.add_argument("src", type=Path)
     args = ap.parse_args()
-    {"nii-cu-mapd": nii, "rgbtdroneperson": rgbtdroneperson, "heridal": heridal}[args.dataset](args.src)
+    {"nii-cu-mapd": nii, "rgbtdroneperson": rgbtdroneperson, "heridal": heridal, "nomad": nomad}[args.dataset](args.src)
 
 
 if __name__ == "__main__":
