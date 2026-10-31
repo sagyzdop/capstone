@@ -22,3 +22,9 @@ paper/*.synctex.gz
 # training outputs
 runs/
 *.pt
+
+# station UI (Next.js)
+node_modules/
+.next/
+interface/models/
+*.tsbuildinfo
