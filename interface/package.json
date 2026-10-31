@@ -1,0 +1,25 @@
+{
+  "name": "station-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export-model": "../.venv/bin/python scripts/export_model.py",
+    "dev": "node server.mjs --dev",
+    "build": "next build",
+    "start": "node server.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "onnxruntime-node": "1.30.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}
