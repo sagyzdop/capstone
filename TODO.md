@@ -12,7 +12,9 @@ Start here. Tick a line when it's done, and delete it once nobody needs to see i
 - [x] Score the RGB models on HERIDAL ([results](research/datasets/README.md#heridal)): AP50 about 0.01, both sizes, tiled or not.
 - [x] Retrain YOLO26n RGB with HERIDAL (location split, `--tag heridal`): HERIDAL test AP50 0.015 to 0.215, SARD and NII-CU-MAPD unchanged ([findings](research/datasets/README.md#findings)).
 - [x] Try HERIDAL only, and HERIDAL weighted 3× with `best.pt` picked on HERIDAL val: neither beats the mixed run ([findings](research/datasets/README.md#findings)).
-- [ ] Add more RGB data like HERIDAL, one dataset per run, scored on HERIDAL's test locations: NOMAD (check its license), then a capped C2A sample ([more data](research/datasets/README.md#more-data)).
+- [x] Add NOMAD to RGB training (`--tag nomad`, saved as `best2.pt`): NOMAD test tiled AP50 0.086 to 0.300, HERIDAL test 0.215 to 0.192 ([findings](research/datasets/README.md#findings)).
+- [ ] Check NOMAD's license before publishing anything trained on it.
+- [ ] Next RGB data, one dataset per run, scored on HERIDAL and NOMAD test: a capped C2A sample ([more data](research/datasets/README.md#more-data)).
 - [ ] Find a held-out thermal test (WiSARD thermal or AIResQ); see [next steps](research/datasets/README.md#next-steps).
 - [ ] Score both models on WiSARD (download the WiSARD sample again; it was only kept in the dropped npz format).
 - [x] Check whether the RGB model saw RGBTDronePerson's RGB images. The first one did, and scored AP50 0.06 on them; `train.py` now trains RGB without them ([why](research/datasets/README.md#rgbtdroneperson)).

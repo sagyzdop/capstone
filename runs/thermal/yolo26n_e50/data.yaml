@@ -1,0 +1,10 @@
+train:
+  - /home/nurbek/Downloads/capstone/data/yolo/rgbtdroneperson-thermal/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/nii-cu-mapd-thermal/images/train
+  - /home/nurbek/Downloads/capstone/data/yolo/hit-uav/images/train
+val:
+  - /home/nurbek/Downloads/capstone/data/yolo/rgbtdroneperson-thermal/images/val
+  - /home/nurbek/Downloads/capstone/data/yolo/nii-cu-mapd-thermal/images/val
+  - /home/nurbek/Downloads/capstone/data/yolo/hit-uav/images/val
+names:
+  0: person

@@ -1,6 +1,8 @@
 # data and secrets
 data/
 .env
+credentials.json
+token.json
 
 # python
 __pycache__/
