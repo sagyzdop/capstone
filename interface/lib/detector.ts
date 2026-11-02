@@ -1,4 +1,5 @@
 // Server-side victim detector: ONNX Runtime on the CPU, same pre/post-processing as ultralytics.
+// Several models can sit in models/ (<name>.onnx + <name>.json); each request names the ones to run.
 import fs from "node:fs";
 import path from "node:path";
 import * as ort from "onnxruntime-node";
@@ -12,38 +13,76 @@ const STRIDE = 32;
 const PAD = 114; // ultralytics letterbox grey
 
 export const MODEL_DIR = path.join(process.cwd(), "models");
+export const DEFAULT_MODEL = "best";
 
-export type Detection = { bbox_xyxy: [number, number, number, number]; conf: number; cls: number; name: string };
+export type Detection = { bbox_xyxy: [number, number, number, number]; conf: number; cls: number; name: string; model: string };
 export type ModelMeta = {
+  name: string;
+  label: string;
+  source: string | null;
+  task: string;
   weights: string;
   base: string | null;
   epochs: number | null;
   imgsz: number;
   trained: string | null;
   names: Record<string, string>;
+  person: number[]; // class ids kept as persons; the rest (cars, bikes...) are dropped
   metrics: Record<string, number>;
 };
-type Model = { session: ort.InferenceSession; meta: ModelMeta; queue: Promise<unknown> };
+type Model = { session: ort.InferenceSession; meta: ModelMeta; nc: number; person: Set<number>; queue: Promise<unknown> };
 type Raw = { data: Buffer; width: number; height: number };
 
-// one session per process; globalThis survives dev hot reloads
-const g = globalThis as typeof globalThis & { __detector?: Promise<Model> };
-
-export function getModel(): Promise<Model> {
-  g.__detector ??= load().catch((e) => {
-    g.__detector = undefined; // let the next request retry instead of caching the failure
-    throw e;
-  });
-  return g.__detector;
+/** Every exported model in MODEL_DIR, default first. Older JSONs (one model, no name) are filled in. */
+export function listModels(): ModelMeta[] {
+  if (!fs.existsSync(MODEL_DIR)) return [];
+  return fs
+    .readdirSync(MODEL_DIR)
+    .filter((f) => f.endsWith(".json") && fs.existsSync(path.join(MODEL_DIR, f.replace(/\.json$/, ".onnx"))))
+    .map((f) => {
+      const name = f.replace(/\.json$/, "");
+      const m = JSON.parse(fs.readFileSync(path.join(MODEL_DIR, f), "utf8")) as Partial<ModelMeta> & { names: Record<string, string> };
+      return {
+        label: name === DEFAULT_MODEL ? "Fine-tuned" : name,
+        source: null,
+        task: "detect",
+        weights: `${name}.pt`,
+        base: null,
+        epochs: null,
+        imgsz: 640,
+        trained: null,
+        person: Object.keys(m.names).map(Number),
+        metrics: {},
+        ...m,
+        name, // the file name is the id
+      } as ModelMeta;
+    })
+    .sort((a, b) => Number(b.name === DEFAULT_MODEL) - Number(a.name === DEFAULT_MODEL) || a.name.localeCompare(b.name));
 }
 
-async function load(): Promise<Model> {
-  const onnx = path.join(MODEL_DIR, "best.onnx");
-  if (!fs.existsSync(onnx)) throw new Error(`${onnx} is missing: run \`npm run export-model\``);
-  const meta = JSON.parse(fs.readFileSync(path.join(MODEL_DIR, "best.json"), "utf8")) as ModelMeta;
+// one session per model per process; globalThis survives dev hot reloads
+const g = globalThis as typeof globalThis & { __detectors?: Map<string, Promise<Model>> };
+
+export function getModel(name = DEFAULT_MODEL): Promise<Model> {
+  const cache = (g.__detectors ??= new Map());
+  let p = cache.get(name);
+  if (!p) {
+    p = load(name).catch((e) => {
+      cache.delete(name); // let the next request retry instead of caching the failure
+      throw e;
+    });
+    cache.set(name, p);
+  }
+  return p;
+}
+
+async function load(name: string): Promise<Model> {
+  const meta = listModels().find((m) => m.name === name);
+  if (!meta) throw new Error(`no model "${name}" in ${MODEL_DIR}: run \`npm run export-model -- --all\``);
+  const onnx = path.join(MODEL_DIR, `${name}.onnx`);
   // CPU beats the CoreML provider for this model on Apple silicon (17 vs 36 ms at 640)
   const session = await ort.InferenceSession.create(onnx, { executionProviders: ["cpu"], graphOptimizationLevel: "all" });
-  const model: Model = { session, meta, queue: Promise.resolve() };
+  const model: Model = { session, meta, nc: Object.keys(meta.names).length, person: new Set(meta.person), queue: Promise.resolve() };
   await infer(model, { data: Buffer.alloc(640 * 640 * 3, PAD), width: 640, height: 640 }, 640); // warm-up
   return model;
 }
@@ -101,14 +140,16 @@ async function infer(model: Model, img: Raw, imgsz: number): Promise<Box[]> {
   const run = model.queue.then(() => model.session.run({ [model.session.inputNames[0]]: tensor }));
   model.queue = run.catch(() => {});
   const out = (await run)[model.session.outputNames[0]];
-  // [1, 4 + nc, A]: rows cx, cy, w, h, then one score per class
+  // [1, 4 + nc (+ 3 * keypoints for pose), A]: rows cx, cy, w, h, one score per class, then keypoints (ignored)
   const [, rows, A] = out.dims as number[];
-  const d = out.data as Float32Array;
+  if (rows < 4 + model.nc) throw new Error(`${model.meta.name}.onnx: output ${out.dims.join("x")} is not [1, 4+nc, anchors]; re-export it`);
+  const d = out.data as Float32Array, end = 4 + model.nc;
   const boxes: Box[] = [];
   for (let a = 0; a < A; a++) {
     let conf = 0, cls = 0;
-    for (let c = 4; c < rows; c++) if (d[c * A + a] > conf) (conf = d[c * A + a]), (cls = c - 4);
-    if (conf < CONF_FLOOR) continue;
+    for (let c = 4; c < end; c++) if (d[c * A + a] > conf) (conf = d[c * A + a]), (cls = c - 4);
+    // best class over all of them first, as ultralytics does with classes=[...], so a car never turns into a person
+    if (conf < CONF_FLOOR || !model.person.has(cls)) continue;
     const cx = d[a], cy = d[A + a], w = d[2 * A + a], h = d[3 * A + a];
     const clip = (v: number, hi: number) => Math.min(Math.max(v, 0), hi);
     boxes.push({
@@ -148,23 +189,26 @@ async function inferTiled(model: Model, img: Raw, tile: number): Promise<Box[]> 
   return nms(all, TILE_IOU);
 }
 
-export async function detect(img: Raw, imgsz: number, tile: number) {
-  const model = await getModel();
-  const t = performance.now();
-  const boxes = tile ? await inferTiled(model, img, tile) : await infer(model, img, imgsz);
-  const ms = performance.now() - t;
+/** Run each named model on the frame, one after the other; every box is tagged with its model. */
+export async function detect(img: Raw, imgsz: number, tile: number, names: string[] = [DEFAULT_MODEL]) {
   const r1 = (v: number) => Math.round(v * 10) / 10;
-  return {
-    width: img.width,
-    height: img.height,
-    ms: r1(ms),
-    detections: boxes.map(
-      (b): Detection => ({
+  const detections: Detection[] = [], times: Record<string, number> = {};
+  let ms = 0;
+  for (const name of names) {
+    const model = await getModel(name);
+    const t = performance.now();
+    const boxes = tile ? await inferTiled(model, img, tile) : await infer(model, img, imgsz);
+    times[name] = r1(performance.now() - t);
+    ms += times[name];
+    for (const b of boxes) {
+      detections.push({
         bbox_xyxy: [r1(b.x1), r1(b.y1), r1(b.x2), r1(b.y2)],
         conf: Math.round(b.conf * 1000) / 1000,
         cls: b.cls,
         name: model.meta.names[b.cls] ?? String(b.cls),
-      }),
-    ),
-  };
+        model: name,
+      });
+    }
+  }
+  return { width: img.width, height: img.height, ms: r1(ms), times, detections };
 }
