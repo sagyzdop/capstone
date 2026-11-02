@@ -10,8 +10,21 @@ Next.js page in front of the victim detector (`best.pt`, YOLO26n, single class `
 cd interface
 npm install
 npm run export-model     # once: best.pt -> models/best.onnx + models/best.json (uses ../.venv, needs ultralytics onnx onnxslim)
+npm run export-model -- --all   # also the pretrained VisDrone and pose models (downloads into weights/)
 npm run dev              # or: npm run build && npm start
 ```
+
+## Models
+
+Every `models/<name>.onnx` + `<name>.json` shows up as a toggle under **Models**; any one, or several at once. Nothing here is trained or fine-tuned beyond `best.pt`:
+
+| Toggle | Weights | Counted as person |
+| --- | --- | --- |
+| Fine-tuned | `best.pt`, YOLO26n trained in this repo | `person` |
+| VisDrone | [`dronefreak/visdrone-yolo26n`](https://huggingface.co/dronefreak/visdrone-yolo26n), YOLO26n fine-tuned on VisDrone-DET at 1280 px (Ultralytics ships no VisDrone weights of its own) | `pedestrian`, `people`; cars, bikes etc. are dropped |
+| Pose | Ultralytics `yolo26n-pose.pt` (COCO keypoints) | its `person` boxes; keypoints are ignored |
+
+With two or more on, boxes are coloured per model and the right panel counts each one. **Merge models** keeps one box per person across models (greedy NMS at IoU 0.5, in the page); a green box was found by more than one model. The scores table shows each model's own val numbers (ours, the VisDrone model card's test split over all 10 classes, COCO pose mAP), which are not comparable with each other.
 
 Open http://localhost:8765, or http://localhost:8765/#camera to go straight to the live webcam feed. Another port: `npm run dev -- --port 8800`. Example frames for "Try samples" come from `../data/samples` (override with `SAMPLES_DIR`).
 
@@ -44,7 +57,7 @@ Open http://localhost:8765, or http://localhost:8765/#camera to go straight to t
 | Path | What |
 | --- | --- |
 | `server.mjs` | Starts Next on one port, both loopbacks, with the busy-port checks above |
-| `lib/detector.ts` | Decode (sharp), letterbox, ONNX Runtime, NMS, tiling; matches ultralytics boxes on `data/samples` (IoU > 0.9) |
+| `lib/detector.ts` | Decode (sharp), letterbox, ONNX Runtime, NMS, tiling, one session per model in `models/`; matches ultralytics boxes on `data/samples` (IoU > 0.9) |
 | `app/api/{info,detect,samples}` | Model info, detection, example frames |
 | `components/Station.tsx` | The whole page |
-| `scripts/export_model.py` | ONNX export with dynamic input size |
+| `scripts/export_model.py` | ONNX export with dynamic input size; `--all` fetches and exports the pretrained models |

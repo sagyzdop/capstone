@@ -40,4 +40,5 @@ runs/*/*/*
 node_modules/
 .next/
 interface/models/
+interface/weights/
 *.tsbuildinfo

@@ -3,20 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type BBox = [number, number, number, number];
-type Det = { bbox_xyxy: BBox; conf: number; cls: number; name: string };
-type DetectResult = { width: number; height: number; ms: number; detections: Det[] };
-type Info = {
+// by: with "merge models" on, every model that found this person (the box is the best-scoring one's)
+type Det = { bbox_xyxy: BBox; conf: number; cls: number; name: string; model: string; by?: string[] };
+type DetectResult = { width: number; height: number; ms: number; times: Record<string, number>; detections: Det[] };
+type ModelInfo = {
+  name: string;
+  label: string;
+  source: string | null;
+  task: string;
   weights: string;
   base: string | null;
   epochs: number | null;
   imgsz: number;
   trained: string | null;
-  classes: string[];
+  classes: string[]; // the classes counted as a person
   metrics: Record<string, number>;
-  device: string;
-  runtime: string;
-  samples: string[];
 };
+type Info = { models: ModelInfo[]; device: string; runtime: string; samples: string[] };
 type Item = {
   id: number;
   name: string;
@@ -26,27 +29,32 @@ type Item = {
   H: number;
   dets: Det[] | null;
   ms: number | null;
+  times: Record<string, number>;
   status: "pending" | "running" | "done" | "error";
   key: string | null; // settings the dets were made with
 };
 type Mode = "image" | "video" | "camera";
-type Settings = { imgsz: number; tile: number };
+type Settings = { imgsz: number; tile: number; models: string[] };
 type Media = { key: number; W: number; H: number; name: string };
-type Live = { dets: Det[]; ms: number; fps: number; hist: number[] };
+type Live = { dets: Det[]; ms: number; times: Record<string, number>; fps: number; hist: number[] };
 // a live detection kept in the list after it leaves the frame; det/at/thumb are from its best-scoring frame
 type Saved = { id: number; det: Det; box: BBox; last: number; seen: number; at: string; thumb: string };
 
 const TINY = 14; // boxes smaller than this many screen px get a ring
 const MAX_SEND = 1280; // live frames go up at most this long side: the detector runs at 640-1280 anyway
 const PALETTE = ["#ff7a1a", "#3fb9f0", "#a371f7", "#3fb950", "#e3b341", "#f778ba"];
-const color = (cls: number) => PALETTE[(cls || 0) % PALETTE.length];
-const label = (d: Det) => `${d.name} ${Math.round(d.conf * 100)}%`;
-const keyOf = (s: Settings) => `${s.imgsz}/${s.tile}`;
+// colour follows the model, so VisDrone and pose boxes can be told apart when both are on
+const MODEL_COLOR: Record<string, string> = { best: PALETTE[0], visdrone: PALETTE[1], pose: PALETTE[2] };
+const modelColor = (m: string) => MODEL_COLOR[m] ?? PALETTE[3 + ([...m].reduce((a, c) => a + c.charCodeAt(0), 0) % 3)];
+const color = (d: Det) => (d.by && d.by.length > 1 ? PALETTE[3] : modelColor(d.model));
+const pct = (d: Det) => `${Math.round(d.conf * 100)}%`;
+const keyOf = (s: Settings) => `${s.imgsz}/${s.tile}/${s.models.join(",")}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const EMPTY_LIVE: Live = { dets: [], ms: 0, fps: 0, hist: [] };
+const EMPTY_LIVE: Live = { dets: [], ms: 0, times: {}, fps: 0, hist: [] };
 const KEEP_GAP = 1500; // ms: a box this soon after a saved one, on the same spot, is the same person
 const KEEP_IOU = 0.3;
 const MAX_SAVED = 500;
+const MERGE_IOU = 0.5; // boxes from different models this close are one person
 let seq = 0;
 
 function iou(a: BBox, b: BBox) {
@@ -54,6 +62,20 @@ function iou(a: BBox, b: BBox) {
   if (w <= 0 || h <= 0) return 0;
   return (w * h) / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - w * h);
 }
+
+/** One box per person across models: greedy NMS by confidence, each kept box remembers who else found it. */
+function mergeModels(ds: Det[]): Det[] {
+  const keep: Det[] = [];
+  for (const d of [...ds].sort((a, b) => b.conf - a.conf)) {
+    const k = keep.find((k) => iou(k.bbox_xyxy, d.bbox_xyxy) >= MERGE_IOU);
+    if (!k) keep.push({ ...d, by: [d.model] });
+    else if (!k.by!.includes(d.model)) k.by!.push(d.model);
+  }
+  return keep;
+}
+
+// saved-list identity: a merged box may come from a different model each frame
+const trackOf = (d: Det) => (d.by ? "*" : `${d.model}/${d.cls}`);
 
 /** Square crop around a detection with its box drawn in. */
 function drawCrop(c: HTMLCanvasElement, src: CanvasImageSource, det: Det, scale: number) {
@@ -66,7 +88,7 @@ function drawCrop(c: HTMLCanvasElement, src: CanvasImageSource, det: Det, scale:
     g.drawImage(src, cx - side / 2, cy - side / 2, side, side, 0, 0, c.width, c.height);
   } catch {}
   const k = c.width / side;
-  g.strokeStyle = color(det.cls);
+  g.strokeStyle = color(det);
   g.lineWidth = 2;
   g.strokeRect((x1 - cx + side / 2) * k, (y1 - cy + side / 2) * k, (x2 - x1) * k, (y2 - y1) * k);
 }
@@ -84,7 +106,7 @@ function remember(log: Saved[], ds: Det[], now: number, at: string, src: CanvasI
   for (const d of ds) {
     let bi = -1, bv = KEEP_IOU;
     next.forEach((e, i) => {
-      if (used.has(e.id) || e.det.cls !== d.cls || now - e.last > KEEP_GAP) return;
+      if (used.has(e.id) || trackOf(e.det) !== trackOf(d) || now - e.last > KEEP_GAP) return;
       const v = iou(e.box, d.bbox_xyxy);
       if (v >= bv) (bv = v), (bi = i);
     });
@@ -108,6 +130,7 @@ async function requestDetect(blob: Blob, name: string, s: Settings): Promise<Det
   fd.append("file", blob, name);
   fd.append("imgsz", String(s.imgsz));
   fd.append("tile", String(s.tile));
+  fd.append("models", s.models.join(","));
   let r: Response;
   try {
     r = await fetch("/api/detect", { method: "POST", body: fd });
@@ -159,14 +182,14 @@ function Crop({ src, det, scale }: { src: CanvasImageSource | null; det: Det; sc
   return <canvas ref={ref} width={104} height={104} />;
 }
 
-function Toggle({ label: text, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label: text, hint, checked, onChange, tint, disabled }: { label: React.ReactNode; hint?: string; checked: boolean; onChange: (v: boolean) => void; tint?: string; disabled?: boolean }) {
   return (
-    <label className="toggle">
+    <label className={`toggle${disabled ? " off" : ""}`} style={tint ? ({ "--accent": tint } as React.CSSProperties) : undefined}>
       <span>
         {text}
         {hint && <small>{hint}</small>}
       </span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <i />
     </label>
   );
@@ -179,6 +202,8 @@ export default function Station() {
   const [conf, setConf] = useState(0.25);
   const [imgsz, setImgsz] = useState(640);
   const [tile, setTile] = useState(false);
+  const [models, setModels] = useState<string[]>(["best"]); // enabled, in info.models order
+  const [merge, setMerge] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [showRings, setShowRings] = useState(true);
   const [items, setItemsState] = useState<Item[]>([]);
@@ -218,20 +243,34 @@ export default function Station() {
   const dragDepth = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const settings: Settings = useMemo(() => ({ imgsz, tile: tile ? 640 : 0 }), [imgsz, tile]);
+  const settings: Settings = useMemo(() => ({ imgsz, tile: tile ? 640 : 0, models }), [imgsz, tile, models]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const confRef = useRef(conf);
   confRef.current = conf;
+  const merging = merge && models.length > 1;
+  const mergingRef = useRef(merging);
+  mergingRef.current = merging;
+  const multi = models.length > 1;
+
+  const modelOf = useMemo(() => new Map((info?.models ?? []).map((m) => [m.name, m])), [info]);
+  const short = (m: string) => modelOf.get(m)?.label ?? m;
+  // the model goes in the label only when there is more than one on the stage
+  const label = (d: Det) => (d.by ? `${d.by.map((m) => short(m)[0]).join("+")} ${d.name} ${pct(d)}` : multi ? `${short(d.model)} · ${d.name} ${pct(d)}` : `${d.name} ${pct(d)}`);
+  // list entry heading: class, plus which model(s) when there is more than one
+  const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+  const title = (d: Det) => cap(d.name) + (d.by ? ` · ${d.by.map(short).join(" + ")}` : multi ? ` · ${short(d.model)}` : "");
 
   const curItem = mode === "image" ? items[cur] : undefined;
   const stage = mode === "image" ? (curItem ? { key: curItem.id, W: curItem.W, H: curItem.H } : null) : media;
   const stageDims = useRef<{ W: number; H: number } | null>(null);
   stageDims.current = stage ? { W: stage.W, H: stage.H } : null;
-  const dets = useMemo(
+  // per-model boxes above the slider, before merging: the per-model counts come from these
+  const raw = useMemo(
     () => (mode === "image" ? curItem?.dets ?? [] : live.dets).filter((d) => d.conf >= conf),
     [mode, curItem, live.dets, conf],
   );
+  const dets = useMemo(() => (merging ? mergeModels(raw) : raw), [raw, merging]);
 
   const showToast = useCallback((msg: string, err = false) => {
     setToast({ msg, err, show: true });
@@ -329,7 +368,7 @@ export default function Station() {
         patchItem(it.id, { status: "running" });
         try {
           const r = await requestDetect(it.file, it.name, settingsRef.current);
-          patchItem(it.id, { dets: r.detections, ms: r.ms, status: "done", key });
+          patchItem(it.id, { dets: r.detections, ms: r.ms, times: r.times, status: "done", key });
         } catch (e) {
           patchItem(it.id, { status: "error", key });
           showToast(`${it.name}: ${(e as Error).message}`, true);
@@ -365,7 +404,7 @@ export default function Station() {
           showToast(`Can't read ${f.name}`, true);
           continue;
         }
-        added.push({ id: ++seq, name: f.name, file: f, url, W: dim[0], H: dim[1], dets: null, ms: null, status: "pending", key: null });
+        added.push({ id: ++seq, name: f.name, file: f, url, W: dim[0], H: dim[1], dets: null, ms: null, times: {}, status: "pending", key: null });
       }
       if (!added.length) return;
       setItems((list) => [...list, ...added]);
@@ -435,9 +474,10 @@ export default function Station() {
           times.push(now);
           while (times.length && now - times[0] > 2000) times.shift();
           const fps = times.length > 1 ? (times.length - 1) / ((now - times[0]) / 1000) : 0;
-          const keep = ds.filter((d) => d.conf >= confRef.current);
+          const above = ds.filter((d) => d.conf >= confRef.current);
+          const keep = mergingRef.current ? mergeModels(above) : above;
           histRef.current = [...histRef.current, keep.length].slice(-120);
-          setLive({ dets: ds, ms: r.ms, fps, hist: histRef.current });
+          setLive({ dets: ds, ms: r.ms, times: r.times, fps, hist: histRef.current });
           // camera: wall clock; video file: position in the clip
           const at = streamRef.current ? new Date().toLocaleTimeString([], { hour12: false }) : clock(v.currentTime);
           if (keep.length) setSaved(remember(savedRef.current, keep, now, at, frame, w / v.videoWidth));
@@ -557,6 +597,7 @@ export default function Station() {
         const body = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(body.detail ?? `HTTP ${r.status}`);
         setInfo(body);
+        if (!body.models.some((m: ModelInfo) => m.name === "best")) setModels([body.models[0].name]);
         setServer("ok");
       } catch (e) {
         setServer("err");
@@ -607,11 +648,13 @@ export default function Station() {
   const shownSaved = saved.filter((e) => e.det.conf >= conf);
   const exportJson = () => {
     // same record format as src/detection/detect.py, plus the class; live: the saved list, with when it was seen
+    const rec = (d: Det) => ({ bbox_xyxy: d.bbox_xyxy, conf: d.conf, cls: d.cls, name: d.name, model: d.model, ...(d.by ? { by: d.by } : {}) });
     const recs = isLive
-      ? shownSaved.map((e) => ({ image: media?.name ?? "", at: e.at, seen: e.seen, bbox_xyxy: e.det.bbox_xyxy, conf: e.det.conf, cls: e.det.cls, name: e.det.name }))
-      : itemsRef.current.flatMap((it) =>
-          (it.dets ?? []).filter((d) => d.conf >= conf).map((d) => ({ image: it.name, bbox_xyxy: d.bbox_xyxy, conf: d.conf, cls: d.cls, name: d.name })),
-        );
+      ? shownSaved.map((e) => ({ image: media?.name ?? "", at: e.at, seen: e.seen, ...rec(e.det) }))
+      : itemsRef.current.flatMap((it) => {
+          const above = (it.dets ?? []).filter((d) => d.conf >= conf);
+          return (merging ? mergeModels(above) : above).map((d) => ({ image: it.name, ...rec(d) }));
+        });
     const a = document.createElement("a");
     a.download = "detections.json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(recs, null, 1)], { type: "application/json" }));
@@ -647,7 +690,18 @@ export default function Station() {
 
   /* ---------- derived display ---------- */
   const s = view.s;
-  const tot = items.reduce((a, i) => a + (i.dets ?? []).filter((d) => d.conf >= conf).length, 0);
+  const countOf = (ds: Det[] | null) => {
+    const above = (ds ?? []).filter((d) => d.conf >= conf);
+    return merging ? mergeModels(above).length : above.length;
+  };
+  const tot = items.reduce((a, i) => a + countOf(i.dets), 0);
+  const times = isLive ? live.times : curItem?.times ?? {};
+  const perModel = models.map((name) => ({ name, n: raw.filter((d) => d.model === name).length, ms: times[name] }));
+  const toggleModel = (name: string, on: boolean) => {
+    const order = (info?.models ?? []).map((m) => m.name);
+    setModels((cur) => order.filter((n) => (n === name ? on : cur.includes(n))));
+    setSel(-1);
+  };
   const statusText = server === "err" ? "Server offline" : server === "connecting" ? "Connecting" : running ? "Live" : busy ? "Detecting" : "Ready";
   const statusDot = server === "err" ? "err" : server === "connecting" ? "" : running || busy ? "busy" : "ok";
   const hudDot = isLive ? (running ? "live" : "") : curItem?.status === "done" ? "ok" : curItem?.status === "error" ? "err" : "busy";
@@ -660,7 +714,7 @@ export default function Station() {
     : isLive
       ? running ? "in current frame" : "last frame"
       : curItem?.status === "running" ? "detecting…" : curItem?.status === "error" ? "failed" : `at conf ≥ ${conf.toFixed(2)}`;
-  const m = info?.metrics ?? {};
+  const countNote = multi && !merging ? `boxes from ${models.length} models, not merged` : merging ? "merged across models" : "";
   const fmt = (v: number | undefined) => (v == null ? "—" : v.toFixed(3));
 
   const fs = 11 / s, pad = 3 / s;
@@ -673,9 +727,10 @@ export default function Station() {
           Victim Detection <small>· Station</small>
         </div>
         <div className="spacer" />
-        {/* the file is what runs; base is only the architecture it was fine-tuned from */}
-        <span className="chip hide-sm" title={info?.base ? `fine-tuned from ${info.base}` : undefined}>
-          Model <b>{info ? info.weights : "…"}</b>{info?.base ? ` · ${info.base.replace(/\.pt$/, "").toUpperCase()}` : ""}
+        {/* the files are what runs; base is only the architecture each was fine-tuned from */}
+        <span className="chip hide-sm" title={models.map((n) => modelOf.get(n)?.source ?? n).join("\n")}>
+          {multi ? "Models" : "Model"} <b>{info ? models.map(short).join(" + ") : "…"}</b>
+          {info && !multi && modelOf.get(models[0])?.base ? ` · ${modelOf.get(models[0])!.base!.replace(/\.pt$/, "").toUpperCase()}` : ""}
         </span>
         <span className="chip hide-sm">Runtime <b>{info ? `${info.runtime} · ${info.device.toUpperCase()}` : "…"}</b></span>
         <span className="chip"><span className={`dot ${statusDot}`} /><b>{statusText}</b></span>
@@ -731,6 +786,30 @@ export default function Station() {
           </section>
 
           <section className="block">
+            <h3>Models</h3>
+            {(info?.models ?? []).map((md) => {
+              const on = models.includes(md.name);
+              return (
+                <div className="field" key={md.name}>
+                  <Toggle
+                    label={md.label}
+                    hint={`${md.weights} · ${md.classes.join(", ")} · trained at ${md.imgsz}px`}
+                    tint={modelColor(md.name)}
+                    checked={on}
+                    disabled={on && models.length === 1}
+                    onChange={(v) => toggleModel(md.name, v)}
+                  />
+                </div>
+              );
+            })}
+            {multi && (
+              <div className="field">
+                <Toggle label="Merge models" hint={`one box per person, IoU ≥ ${MERGE_IOU}; green = found by several`} checked={merge} onChange={(v) => { setMerge(v); setSel(-1); }} />
+              </div>
+            )}
+          </section>
+
+          <section className="block">
             <h3>Detection</h3>
             <div className="field">
               <div className="field-head"><span>Confidence</span><output>{conf.toFixed(2)}</output></div>
@@ -739,7 +818,7 @@ export default function Station() {
             <div className="field">
               <div className="field-head"><span>Input size</span></div>
               <select value={imgsz} onChange={(e) => setImgsz(Number(e.target.value))}>
-                <option value={640}>640 px · trained size</option>
+                <option value={640}>640 px</option>
                 <option value={960}>960 px</option>
                 <option value={1280}>1280 px · small persons</option>
               </select>
@@ -754,17 +833,24 @@ export default function Station() {
           </section>
 
           <section className="block">
-            <h3>Model</h3>
-            <div className="metrics">
-              {[["mAP50", m.mAP50], ["mAP50-95", m["mAP50-95"]], ["Precision", m.precision], ["Recall", m.recall]].map(([k, v]) => (
-                <div className="metric" key={k as string}><span>{k}</span><b>{fmt(v as number | undefined)}</b></div>
-              ))}
-            </div>
+            <h3>Model scores</h3>
+            <table className="mtable">
+              <thead><tr><th /><th>mAP50</th><th>50-95</th><th>P</th><th>R</th></tr></thead>
+              <tbody>
+                {(info?.models ?? []).map((md) => (
+                  <tr key={md.name} className={models.includes(md.name) ? "" : "faded"}>
+                    <th style={{ color: modelColor(md.name) }}>{md.label}</th>
+                    {["mAP50", "mAP50-95", "precision", "recall"].map((k) => <td key={k}>{fmt(md.metrics[k])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             {info && (
               <div className="meta">
-                <b>{info.weights}</b> · classes: {info.classes.join(", ")}<br />
-                {info.epochs ?? "?"} epochs at {info.imgsz}px{info.trained ? ` · ${info.trained.slice(0, 10)}` : ""}<br />
-                val split metrics from training
+                {info.models.map((md) => (
+                  <div key={md.name}><b>{md.label}</b>: {md.source ?? md.weights}{md.epochs ? ` · ${md.epochs} ep` : ""}{md.trained ? ` · ${md.trained.slice(0, 10)}` : ""}</div>
+                ))}
+                Each on its own val set (ours, VisDrone-DET test, COCO pose), so not comparable across rows: compare them on the stage.
               </div>
             )}
           </section>
@@ -808,7 +894,7 @@ export default function Station() {
                 <svg width={stage.W} height={stage.H} viewBox={`0 0 ${stage.W} ${stage.H}`} className={sel >= 0 ? "dim" : ""}>
                   {dets.map((d, i) => {
                     const [x1, y1, x2, y2] = d.bbox_xyxy, w = x2 - x1, h = y2 - y1, on = i === sel ? " sel" : "";
-                    const style = { "--c": color(d.cls) } as React.CSSProperties;
+                    const style = { "--c": color(d) } as React.CSSProperties;
                     const txt = label(d), tw = txt.length * fs * 0.62 + pad * 2, th = fs + pad * 2, ty = y1 - th < 0 ? y2 : y1 - th;
                     return (
                       <g key={i}>
@@ -887,7 +973,7 @@ export default function Station() {
           {mode === "image" && items.length > 0 && (
             <div className="strip">
               {items.map((it, i) => {
-                const n = (it.dets ?? []).filter((d) => d.conf >= conf).length, wait = it.status === "pending" || it.status === "running";
+                const n = countOf(it.dets), wait = it.status === "pending" || it.status === "running";
                 return (
                   <div key={it.id} className={`thumb${i === cur ? " on" : ""}`} title={it.name} onClick={() => setCur(i)}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -910,6 +996,19 @@ export default function Station() {
               <div><span>Frame</span><b>{stage ? `${stage.W}×${stage.H}` : "—"}</b></div>
               <div><span>{isLive ? "FPS" : "Batch"}</span><b>{isLive ? (live.fps ? live.fps.toFixed(1) : "—") : items.length ? `${tot} / ${items.length}` : "—"}</b></div>
             </div>
+            {multi && (
+              <div className="per-model">
+                {perModel.map((p) => (
+                  <div key={p.name}>
+                    <i style={{ background: modelColor(p.name) }} />
+                    <span>{short(p.name)}</span>
+                    <b>{stage ? p.n : "—"}</b>
+                    <small>{p.ms != null ? `${p.ms.toFixed(0)} ms` : ""}</small>
+                  </div>
+                ))}
+                <div className="note">{countNote}</div>
+              </div>
+            )}
             <svg className="spark" viewBox="0 0 120 40" preserveAspectRatio="none">
               <polygon points={sparkPts.length ? `${sparkPts[0].split(",")[0]},40 ${sparkPts.join(" ")} 120,40` : ""} />
               <polyline points={sparkPts.join(" ")} />
@@ -941,9 +1040,9 @@ export default function Station() {
                       <div key={e.id} className={`det${e.id === savedSel ? " sel" : ""}`} onClick={() => { const on = e.id !== savedSel; setSavedSel(on ? e.id : -1); if (on) zoomTo(e.det); }}>
                         <img src={e.thumb} alt="" />
                         <div>
-                          <div className="t" style={{ color: color(e.det.cls) }}>{e.det.name[0].toUpperCase() + e.det.name.slice(1)}<small>{e.at}</small></div>
+                          <div className="t" style={{ color: color(e.det) }}>{title(e.det)}<small>{e.at}</small></div>
                           <div className="s">{Math.round(x2 - x1)}×{Math.round(y2 - y1)} px · seen {e.seen}×</div>
-                          <div className="bar"><i style={{ width: `${e.det.conf * 100}%`, background: color(e.det.cls) }} /></div>
+                          <div className="bar"><i style={{ width: `${e.det.conf * 100}%`, background: color(e.det) }} /></div>
                         </div>
                         <div className="pct">{Math.round(e.det.conf * 100)}%</div>
                       </div>
@@ -962,9 +1061,9 @@ export default function Station() {
                     <div key={i} className={`det${i === sel ? " sel" : ""}`} onClick={() => select(i, !isLive)}>
                       <Crop src={cropSrc} det={d} scale={cropScale} />
                       <div>
-                        <div className="t" style={{ color: color(d.cls) }}>{d.name[0].toUpperCase() + d.name.slice(1)}<small>#{i + 1}</small></div>
+                        <div className="t" style={{ color: color(d) }}>{title(d)}<small>#{i + 1}</small></div>
                         <div className="s">{Math.round(x2 - x1)}×{Math.round(y2 - y1)} px · ({Math.round((x1 + x2) / 2)}, {Math.round((y1 + y2) / 2)})</div>
-                        <div className="bar"><i style={{ width: `${d.conf * 100}%`, background: color(d.cls) }} /></div>
+                        <div className="bar"><i style={{ width: `${d.conf * 100}%`, background: color(d) }} /></div>
                       </div>
                       <div className="pct">{Math.round(d.conf * 100)}%</div>
                     </div>
