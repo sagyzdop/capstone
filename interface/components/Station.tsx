@@ -734,6 +734,7 @@ export default function Station() {
         </span>
         <span className="chip hide-sm">Runtime <b>{info ? `${info.runtime} · ${info.device.toUpperCase()}` : "…"}</b></span>
         <span className="chip"><span className={`dot ${statusDot}`} /><b>{statusText}</b></span>
+        <a className="chip" href="/thermal" style={{ textDecoration: "none" }} title="Live MLX90640 stream from the Pi">Thermal</a>
       </header>
 
       <main>

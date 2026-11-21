@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "export-model": "../.venv/bin/python scripts/export_model.py",
+    "export-model": "python scripts/export_model.py",
+    "thermal-model": "python scripts/make_thermal_model.py",
     "dev": "node server.mjs --dev",
     "build": "next build",
     "start": "node server.mjs",

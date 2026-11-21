@@ -9,8 +9,9 @@ Next.js page in front of the victim detector (`best.pt`, YOLO26n, single class `
 ```bash
 cd interface
 npm install
-npm run export-model     # once: best.pt -> models/best.onnx + models/best.json (uses ../.venv, needs ultralytics onnx onnxslim)
-npm run export-model -- --all   # also the pretrained VisDrone and pose models (downloads into weights/)
+conda activate capstone
+npm run export-model     # once: best.pt -> models/best.onnx + models/best.json (active python, needs ultralytics onnx onnxslim)
+npm run thermal-model    # once: models/thermal.onnx + models/thermal.json for the MLX90640 page (needs onnx)
 npm run dev              # or: npm run build && npm start
 ```
 
@@ -52,6 +53,14 @@ Open http://localhost:8765, or http://localhost:8765/#camera to go straight to t
 - Boxes smaller than 14 screen px get a dashed ring so tiny persons stay visible; scroll zooms, drag pans, clicking a detection zooms to it.
 - **Export detections.json** writes the same records as `src/detection/detect.py`, plus `cls` and `name`; in video and camera mode it writes the saved list, with `at` and `seen`.
 
+## MLX90640 thermal
+
+The Pi runs `raspberry/mlx_stream.cpp` (in git history, `e560cd2`) and sends 3096-byte UDP packets (768 float32 °C, 24×32) to this machine on port 5005 (`THERMAL_UDP_PORT` to change). `lib/thermal.ts` listens, renders each frame to a 640×480 JPEG and runs `models/thermal.onnx` on the raw temperatures.
+
+- http://localhost:8765/thermal shows the live frame with person boxes, min/max/sensor °C and frame age.
+- `GET /api/thermal/frame` is the JPEG; header `x-thermal-detections` carries that frame's boxes. `GET /api/thermal/detections` is the same as JSON. Both answer 503 until frames arrive.
+- `thermal.onnx` is not trained: no labelled MLX90640 data exists yet. It is a fixed body-temperature band (28 to 40 °C, `scripts/make_thermal_model.py --lo --hi`) with a 3×3 smoothing, giving a per-pixel person probability; blobs of 3+ pixels above 0.5 become boxes (`threshold`, `min_pixels` in `thermal.json`). A trained model drops in if it keeps the contract: input `[1,1,24,32]` °C, output `[1,1,24,32]` probability. Two people touching merge into one box, and a warm room (≥ 28 °C) lights up everywhere.
+
 ## Layout
 
 | Path | What |
@@ -60,4 +69,6 @@ Open http://localhost:8765, or http://localhost:8765/#camera to go straight to t
 | `lib/detector.ts` | Decode (sharp), letterbox, ONNX Runtime, NMS, tiling, one session per model in `models/`; matches ultralytics boxes on `data/samples` (IoU > 0.9) |
 | `app/api/{info,detect,samples}` | Model info, detection, example frames |
 | `components/Station.tsx` | The whole page |
-| `scripts/export_model.py` | ONNX export with dynamic input size; `--all` fetches and exports the pretrained models |
+| `scripts/export_model.py` | ONNX export with dynamic input size |
+| `lib/thermal.ts`, `app/api/thermal/*`, `app/thermal/` | MLX90640 UDP ingest, person boxes, live page |
+| `scripts/make_thermal_model.py` | Writes `models/thermal.onnx` + `thermal.json` |
