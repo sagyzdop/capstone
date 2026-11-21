@@ -1,7 +1,7 @@
 // mlx_stream.cpp — читает MLX90640 на Raspberry Pi и шлёт кадры температур по UDP.
 //
-// Сборка (в папке mlx90640-library, после `make I2C_MODE=LINUX`):
-//   g++ -O2 -std=c++11 -I. mlx_stream.cpp libMLX90640_API.a -o mlx_stream
+// Сборка (на Pi, из любой папки; клонирует pimoroni/mlx90640-library и собирает):
+//   bash raspberry/build_mlx_stream.sh
 // Запуск:
 //   ./mlx_stream <IP_ноутбука> [порт=5005] [частота_Гц=64]
 //
