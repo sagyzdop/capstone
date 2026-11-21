@@ -89,7 +89,9 @@ async function load(name: string): Promise<Model> {
 
 /** Decode any image (EXIF-rotated) to packed RGB. */
 export async function decode(buf: Buffer): Promise<Raw> {
-  const { data, info } = await sharp(buf).rotate().removeAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
+  // failOn "none": webcam MJPEG (the Pi's Logitech) often has small defects that libjpeg only warns about,
+  // e.g. a missing EOI; browsers show such frames, sharp's default ("warning") rejects them
+  const { data, info } = await sharp(buf, { failOn: "none" }).rotate().removeAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height };
 }
 

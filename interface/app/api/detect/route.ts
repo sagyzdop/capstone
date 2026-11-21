@@ -26,8 +26,8 @@ export async function POST(req: Request) {
   let img;
   try {
     img = await decode(Buffer.from(await file.arrayBuffer()));
-  } catch {
-    return Response.json({ detail: "not an image" }, { status: 400 });
+  } catch (e) {
+    return Response.json({ detail: `not an image (${(e as Error).message.split("\n")[0]})` }, { status: 400 });
   }
   try {
     return Response.json(await detect(img, imgsz, tile, models));
