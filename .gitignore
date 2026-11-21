@@ -42,3 +42,4 @@ node_modules/
 interface/models/
 interface/weights/
 *.tsbuildinfo
+interface/recordings/
