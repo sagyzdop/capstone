@@ -1,4 +1,5 @@
 import { DEFAULT_MODEL, getModel, listModels } from "@/lib/detector";
+import { piDefaultUrl } from "@/lib/picam";
 import { listSamples } from "@/lib/samples";
 
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ export async function GET() {
       device: "cpu",
       runtime: "ONNX Runtime",
       samples: listSamples(),
+      picam: piDefaultUrl(),
     });
   } catch (e) {
     return Response.json({ detail: (e as Error).message }, { status: 503 });

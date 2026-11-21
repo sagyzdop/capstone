@@ -19,7 +19,7 @@ type ModelInfo = {
   classes: string[]; // the classes counted as a person
   metrics: Record<string, number>;
 };
-type Info = { models: ModelInfo[]; device: string; runtime: string; samples: string[] };
+type Info = { models: ModelInfo[]; device: string; runtime: string; samples: string[]; picam?: string };
 type Item = {
   id: number;
   name: string;
@@ -33,7 +33,7 @@ type Item = {
   status: "pending" | "running" | "done" | "error";
   key: string | null; // settings the dets were made with
 };
-type Mode = "image" | "video" | "camera";
+type Mode = "image" | "video" | "camera" | "pi";
 type Settings = { imgsz: number; tile: number; models: string[] };
 type Media = { key: number; W: number; H: number; name: string };
 type Live = { dets: Det[]; ms: number; times: Record<string, number>; fps: number; hist: number[] };
@@ -170,7 +170,10 @@ const MODE_ICON: Record<Mode, React.ReactNode> = {
   image: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-9 9" /></svg>,
   video: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m10 9 5 3-5 3z" /></svg>,
   camera: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M15 10l5-3v10l-5-3" /><rect x="3" y="6" width="12" height="12" rx="2" /></svg>,
+  pi: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0" /><circle cx="12" cy="19.5" r="1.2" fill="currentColor" /></svg>,
 };
+const MODE_LABEL: Record<Mode, string> = { image: "Images", video: "Video", camera: "Camera", pi: "Pi cam" };
+const PI_KEY = "station.piAddr";
 
 /** Square crop around a detection, drawn from the image or the last live frame. */
 function Crop({ src, det, scale }: { src: CanvasImageSource | null; det: Det; scale: number }) {
@@ -219,6 +222,8 @@ export default function Station() {
   const [running, setRunning] = useState(false);
   const [cams, setCams] = useState<MediaDeviceInfo[]>([]);
   const [camId, setCamId] = useState<string | null>(null);
+  const [piAddr, setPiAddr] = useState(""); // empty: the server's PICAM_URL
+  const [piStatus, setPiStatus] = useState({ msg: "", err: false });
   const [imgReady, setImgReady] = useState(0); // id of the item whose <img> has loaded
   const [toast, setToast] = useState({ msg: "", err: false, show: false });
   const [dragOver, setDragOver] = useState(false);
@@ -227,6 +232,7 @@ export default function Station() {
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const piRef = useRef<HTMLImageElement>(null); // the Pi feed, re-served by /api/picam/stream
   const captureRef = useRef<HTMLCanvasElement | null>(null); // frame being sent
   const frameRef = useRef<HTMLCanvasElement | null>(null); // frame the current live dets belong to
   const imagesInput = useRef<HTMLInputElement>(null);
@@ -442,33 +448,84 @@ export default function Station() {
       if (v) v.srcObject = null;
       setMedia(null);
     } else v?.pause();
+    if (piRef.current?.hasAttribute("src")) {
+      piRef.current.removeAttribute("src"); // drops the stream connection
+      setMedia(null);
+    }
+  }, []);
+
+  /** Next live frame: drawn from the <video>, or the Pi's newest JPEG sent as is. */
+  const grab = useCallback(async (pi: string | null) => {
+    const cap = (captureRef.current ??= document.createElement("canvas"));
+    const g = cap.getContext("2d")!;
+    if (pi == null) {
+      const v = videoRef.current!;
+      if (v.readyState < 2 || !v.videoWidth) return null;
+      const k = Math.min(1, MAX_SEND / Math.max(v.videoWidth, v.videoHeight));
+      const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+      if (cap.width !== w || cap.height !== h) (cap.width = w), (cap.height = h);
+      g.drawImage(v, 0, 0, w, h);
+      const blob = await new Promise<Blob | null>((r) => cap.toBlob(r, "image/jpeg", 0.85));
+      // camera: wall clock; video file: position in the clip
+      const at = streamRef.current ? new Date().toLocaleTimeString([], { hour12: false }) : clock(v.currentTime);
+      return blob && { blob, W: v.videoWidth, H: v.videoHeight, at, fps: 0, host: "" };
+    }
+    const r = await fetch(`/api/picam/frame?src=${encodeURIComponent(pi)}`, { cache: "no-store" });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? `HTTP ${r.status}`);
+    const blob = await r.blob();
+    const bmp = await createImageBitmap(blob);
+    if (cap.width !== bmp.width || cap.height !== bmp.height) (cap.width = bmp.width), (cap.height = bmp.height);
+    g.drawImage(bmp, 0, 0);
+    bmp.close();
+    return { blob, W: cap.width, H: cap.height, at: new Date().toLocaleTimeString([], { hour12: false }), fps: Number(r.headers.get("x-picam-fps")) || 0, host: new URL(r.headers.get("x-picam-url") ?? "http://pi").host };
   }, []);
 
   const liveLoop = useCallback(
-    async (token: number) => {
-      const v = videoRef.current!;
+    async (token: number, pi: string | null = null) => {
       const cap = (captureRef.current ??= document.createElement("canvas"));
       const frame = (frameRef.current ??= document.createElement("canvas"));
-      const g = cap.getContext("2d")!;
       const times: number[] = [];
+      let dims = "", lastSent = 0, down = false;
       while (liveToken.current === token) {
-        if (v.readyState < 2 || !v.videoWidth) {
+        let got: Awaited<ReturnType<typeof grab>>;
+        try {
+          got = await grab(pi);
+        } catch (e) {
+          // the Pi is unreachable or still connecting: say so on the page and keep trying
+          if (liveToken.current !== token) break;
+          setPiStatus({ msg: (e as Error).message, err: dims !== "" });
+          if (dims && !down) showToast(`Pi camera: ${(e as Error).message}`, true);
+          down = true;
+          await sleep(500);
+          continue;
+        }
+        if (!got) {
           await sleep(50);
           continue;
         }
-        const k = Math.min(1, MAX_SEND / Math.max(v.videoWidth, v.videoHeight));
-        const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
-        if (cap.width !== w || cap.height !== h) (cap.width = w), (cap.height = h);
-        g.drawImage(v, 0, 0, w, h);
-        const blob = await new Promise<Blob | null>((r) => cap.toBlob(r, "image/jpeg", 0.85));
-        if (!blob) continue;
+        if (liveToken.current !== token) break;
+        const { blob, W, H, at } = got;
+        if (pi != null) {
+          down = false;
+          if (dims !== `${W}x${H}`) {
+            // first frame, or the Pi changed resolution: put the feed on stage at its size
+            dims = `${W}x${H}`;
+            setMedia({ key: ++seq, W, H, name: `Pi · ${got.host}` });
+            piRef.current!.src = `/api/picam/stream?src=${encodeURIComponent(pi)}&k=${seq}`;
+          }
+          if (performance.now() - lastSent > 1000) {
+            lastSent = performance.now();
+            setPiStatus({ msg: `${got.host} · ${W}×${H} · ${got.fps.toFixed(0)} fps from the Pi`, err: false });
+          }
+        }
+        const w = cap.width, h = cap.height;
         try {
           const r = await requestDetect(blob, "frame.jpg", settingsRef.current);
           if (liveToken.current !== token) break;
           // keep the frame these boxes belong to, for the crops in the list
           if (frame.width !== w || frame.height !== h) (frame.width = w), (frame.height = h);
           frame.getContext("2d")!.drawImage(cap, 0, 0);
-          const sx = v.videoWidth / r.width;
+          const sx = W / r.width;
           const ds = r.detections.map((d) => ({ ...d, bbox_xyxy: d.bbox_xyxy.map((x) => x * sx) as BBox }));
           const now = performance.now();
           times.push(now);
@@ -478,9 +535,7 @@ export default function Station() {
           const keep = mergingRef.current ? mergeModels(above) : above;
           histRef.current = [...histRef.current, keep.length].slice(-120);
           setLive({ dets: ds, ms: r.ms, times: r.times, fps, hist: histRef.current });
-          // camera: wall clock; video file: position in the clip
-          const at = streamRef.current ? new Date().toLocaleTimeString([], { hour12: false }) : clock(v.currentTime);
-          if (keep.length) setSaved(remember(savedRef.current, keep, now, at, frame, w / v.videoWidth));
+          if (keep.length) setSaved(remember(savedRef.current, keep, now, at, frame, w / W));
           setSel((s) => (s >= ds.length ? -1 : s));
         } catch (e) {
           showToast(`Detector error: ${(e as Error).message}`, true);
@@ -488,7 +543,7 @@ export default function Station() {
         }
       }
     },
-    [setSaved, showToast],
+    [grab, setSaved, showToast],
   );
 
   const startLive = useCallback(() => {
@@ -531,6 +586,24 @@ export default function Station() {
       }
     },
     [camId, setSaved, showToast, startLive, stopLive],
+  );
+
+  const startPi = useCallback(
+    (addr: string) => {
+      stopLive();
+      const a = addr.trim();
+      try {
+        localStorage.setItem(PI_KEY, a);
+      } catch {}
+      histRef.current = [];
+      setLive(EMPTY_LIVE);
+      setSaved([]);
+      setPiStatus({ msg: "connecting…", err: false });
+      const token = ++liveToken.current;
+      setRunning(true);
+      liveLoop(token, a);
+    },
+    [liveLoop, setSaved, stopLive],
   );
 
   const switchMode = useCallback(
@@ -603,9 +676,15 @@ export default function Station() {
         setServer("err");
         showToast(`Detector not ready: ${(e as Error).message}`, true);
       }
+      let addr = "";
+      try {
+        addr = localStorage.getItem(PI_KEY) ?? "";
+      } catch {}
+      setPiAddr(addr);
       const m = location.hash.slice(1);
-      if (m === "video" || m === "camera") switchMode(m);
+      if (m === "video" || m === "camera" || m === "pi") switchMode(m);
       if (m === "camera") startCamera(null);
+      if (m === "pi") startPi(addr);
     })();
     // once, on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -743,10 +822,10 @@ export default function Station() {
           <section className="block">
             <h3>Source</h3>
             <div className="seg">
-              {(["image", "video", "camera"] as Mode[]).map((k) => (
-                <button key={k} className={mode === k ? "on" : ""} onClick={() => mode !== k && switchMode(k)}>
+              {(["image", "video", "camera", "pi"] as Mode[]).map((k) => (
+                <button key={k} className={mode === k ? "on" : ""} onClick={() => mode !== k && switchMode(k)} title={k === "pi" ? "Logitech webcam on the Raspberry Pi, over Wi-Fi" : undefined}>
                   {MODE_ICON[k]}
-                  {k === "image" ? "Images" : k === "video" ? "Video" : "Camera"}
+                  {MODE_LABEL[k]}
                 </button>
               ))}
             </div>
@@ -759,7 +838,27 @@ export default function Station() {
                 ) : (
                   <button className="btn primary" onClick={() => startCamera()}><IPlay />Start camera</button>
                 ))}
+              {mode === "pi" &&
+                (running ? (
+                  <button className="btn danger" onClick={stopLive}><IStop />Disconnect</button>
+                ) : (
+                  <button className="btn primary" onClick={() => startPi(piAddr)}><IPlay />Connect</button>
+                ))}
             </div>
+            {mode === "pi" && (
+              <>
+                <input
+                  className="text-input"
+                  value={piAddr}
+                  spellCheck={false}
+                  placeholder={info?.picam ?? "raspberrypi.local:8080"}
+                  title="Pi address: host, host:port or the full /stream URL. Empty: the server's PICAM_URL"
+                  onChange={(e) => setPiAddr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && startPi(piAddr)}
+                />
+                {running && piStatus.msg && <div className={`meta${piStatus.err ? " err" : ""}`}>{piStatus.msg}</div>}
+              </>
+            )}
             {mode === "image" && items.length > 0 && (
               <div className="row"><button className="btn" onClick={clearItems}><ITrash />Clear</button></div>
             )}
@@ -890,7 +989,9 @@ export default function Station() {
                 />
               )}
               {/* always mounted, so a camera can be attached before the first render of its mode */}
-              <video ref={videoRef} muted playsInline width={media?.W} height={media?.H} style={{ display: isLive && media ? "block" : "none" }} />
+              <video ref={videoRef} muted playsInline width={media?.W} height={media?.H} style={{ display: isLive && mode !== "pi" && media ? "block" : "none" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img ref={piRef} alt="" draggable={false} width={media?.W} height={media?.H} style={{ display: mode === "pi" && media ? "block" : "none" }} />
               {stage && (
                 <svg width={stage.W} height={stage.H} viewBox={`0 0 ${stage.W} ${stage.H}`} className={sel >= 0 ? "dim" : ""}>
                   {dets.map((d, i) => {
@@ -965,6 +1066,23 @@ export default function Station() {
                     <h2>Live camera</h2>
                     <p>Use a webcam or a capture card carrying the drone feed.</p>
                     <div className="row"><button className="btn primary" onClick={() => startCamera()}><IPlay />Start camera</button></div>
+                  </>
+                )}
+                {mode === "pi" && (
+                  <>
+                    <h2>Raspberry Pi camera</h2>
+                    <p>
+                      The Logitech webcam on the Pi, streamed over Wi-Fi. Detection runs here.
+                      <br />
+                      {running ? piStatus.msg : `Pi at ${piAddr || info?.picam || "raspberrypi.local:8080"}`}
+                    </p>
+                    <div className="row">
+                      {running ? (
+                        <button className="btn danger" onClick={stopLive}><IStop />Disconnect</button>
+                      ) : (
+                        <button className="btn primary" onClick={() => startPi(piAddr)}><IPlay />Connect</button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>

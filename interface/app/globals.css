@@ -62,7 +62,7 @@ h3 {
 }
 
 /* segmented control */
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
 .seg button {
   border: 0; background: transparent; padding: 7px 0; border-radius: 6px; cursor: pointer; color: var(--muted);
   display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px;
@@ -155,6 +155,9 @@ select {
 .tag { pointer-events: none; }
 .tag rect { fill: var(--c, var(--accent)); }
 .cam-select { margin-top: 8px; }
+.text-input { width: 100%; margin-top: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel-2); color: var(--text); font: 12px var(--mono); box-sizing: border-box; outline: none; }
+.text-input:focus { border-color: var(--accent); }
+.meta.err { color: var(--err); }
 .tag text { fill: #1a0d02; font-family: var(--mono); font-weight: 600; }
 .dim .box:not(.sel), .dim .tag:not(.sel), .dim .ring:not(.sel) { opacity: .35; }
 

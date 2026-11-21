@@ -45,6 +45,7 @@ Open http://localhost:8765, or http://localhost:8765/#camera to go straight to t
 | Images | Drop, pick or paste one or many; each is detected once, the filmstrip shows counts |
 | Video | A local file plays in the page; frames go to `POST /api/detect` as fast as the model returns |
 | Camera | Webcam or a capture card carrying the drone feed; pick the device when there is more than one |
+| Pi cam | The Logitech webcam on the Raspberry Pi, over Wi-Fi (see below) |
 
 - Every box is labelled with its class and confidence (`person 87%`), coloured per class; the stage shows live FPS and inference ms.
 - The server returns every box above conf 0.05; the confidence slider filters in the page, so it reacts instantly.
@@ -52,6 +53,15 @@ Open http://localhost:8765, or http://localhost:8765/#camera to go straight to t
 - Input size 640 / 960 / 1280 and tiled inference (640 px tiles, 20% overlap, same as `src/detection/eval_sizes.py`) re-run the detector.
 - Boxes smaller than 14 screen px get a dashed ring so tiny persons stay visible; scroll zooms, drag pans, clicking a detection zooms to it.
 - **Export detections.json** writes the same records as `src/detection/detect.py`, plus `cls` and `name`; in video and camera mode it writes the saved list, with `at` and `seen`.
+
+## Raspberry Pi webcam
+
+The Pi only captures. It runs `ustreamer`, which passes the Logitech webcam's own MJPEG through without re-encoding, at `http://<pi>:8080/stream`. Inference runs here. Pi setup (Wi-Fi client or hotspot, systemd service) is in [`../raspberry/README.md`](../raspberry/README.md).
+
+- Open http://localhost:8765/#pi, enter the Pi address (`raspberrypi.local:8080`, `10.42.0.1:8080` on the Pi's hotspot, or a full `/stream` URL) and press **Connect**. The address is remembered in the browser. The default comes from `PICAM_URL` (default `http://raspberrypi.local:8080/stream`).
+- `lib/picam.ts` keeps **one** connection to the Pi per server process, so Wi-Fi carries the feed once. It reconnects after 1 s on errors or after 5 s without data, and hangs up 15 s after the last page stops asking.
+- `GET /api/picam/stream?src=` re-serves the feed from this origin for the stage `<img>`, dropping frames for slow readers. `GET /api/picam/frame?src=` returns the newest JPEG, which the page posts to `/api/detect` as is. It answers 503 with the reason (connecting, host not found, not an MJPEG stream) when there is no frame from the last 3 s, so the detector never runs on a frozen frame.
+- No Pi: `python ../raspberry/fake_cam_stream.py [--video clip.mp4 | --webcam]` serves the same `/stream` on port 8080 (needs ffmpeg).
 
 ## MLX90640 thermal
 
@@ -71,4 +81,5 @@ The Pi runs `raspberry/mlx_stream.cpp` (in git history, `e560cd2`) and sends 309
 | `components/Station.tsx` | The whole page |
 | `scripts/export_model.py` | ONNX export with dynamic input size |
 | `lib/thermal.ts`, `app/api/thermal/*`, `app/thermal/` | MLX90640 UDP ingest, person boxes, live page |
+| `lib/picam.ts`, `app/api/picam/{frame,stream}` | Pi webcam MJPEG ingest, newest frame, re-served stream |
 | `scripts/make_thermal_model.py` | Writes `models/thermal.onnx` + `thermal.json` |
