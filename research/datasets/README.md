@@ -1,6 +1,8 @@
 # Datasets and detection
 
-The station runs two YOLO26 models, one RGB and one thermal, and fuses their boxes late. The design is in [SPEC.md](../../SPEC.md#detection). This file covers the data each model trains and is tested on, how to convert and train, the laptop test, which data to add next and, at the bottom, what the training runs found.
+The station runs one RGB YOLO26 model on the UAV module's frames; the design is in [SPEC.md](../../SPEC.md#detection). This file covers the data it trains and is tested on, how to convert and train, the laptop test, which data to add next and, at the bottom, what the training runs found.
+
+Thermal is out of scope since 2026-11-24 (cost of a usable camera, and no held-out test). The thermal datasets, runs and findings below are kept as a record.
 
 ## Training data
 
@@ -12,7 +14,7 @@ Every dataset is converted to one class, `person`, and trained at `imgsz=640`. D
 | [NII-CU-MAPD](https://www.nii-cu-multispectral.org/) | RGB and thermal | 5,880 aligned pairs from a drone at 20 to 50 m over a baseball field in Chiba, Japan, January 2020 | CC BY-NC-SA 3.0 |
 | [HERIDAL](https://universe.roboflow.com/drone-internship/heridal-human-detection) (Roboflow export v4) | RGB | Real SAR exercises in Croatian karst, forest, maquis, snow and a city park; volunteers stand, walk, sit and lie | CC BY 4.0 |
 | [NOMAD](https://github.com/ArtRuss/NOMAD) (30 m subset, `a30`) | RGB | 100 actors walking, lying and hiding (under trees, in a truck bed, by buildings), frames from 5.4K drone video | Not stated |
-| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal | 6,125 pairs of tiny people in streets, campuses, parks and piers, day and night, top-down and oblique | Not verified |
+| [RGBTDronePerson](https://nnnnerd.github.io/RGBTDronePerson/) ([code](https://github.com/NNNNerd/mmdet-rgbtdroneperson)) | Thermal | 6,125 pairs of tiny people in streets, campuses, parks and piers, day and night, top-down and oblique | CC BY 4.0 (project page) |
 | [HIT-UAV](https://zenodo.org/record/7633134) | Thermal | 2,898 images at 640×512 from 60 to 130 m over a campus and roads, day and night | CC0 on Zenodo; GitHub says CC BY 4.0 |
 
 ### SARD

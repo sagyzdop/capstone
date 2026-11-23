@@ -2,17 +2,18 @@
 
 CSCI 408 senior project, Group 19.
 
-After an earthquake, roads, buildings and phone networks are damaged, and sending people into an unassessed area is slow and dangerous. A vehicle carries a laptop (the station), a drone and a ground robot to a collapse site. The drone streams RGB and thermal video to the station, which finds victims and shows them on a map. The operator drives the robot to a victim to check their state and talk to them.
+After an earthquake, roads, buildings and phone networks are damaged, and sending people into an unassessed area is slow and dangerous. A vehicle carries a laptop (the station), a WiFi router, a drone and a ground robot to a collapse site. A pilot flies the drone; a UAV module on it streams RGB video to the station, which finds victims and shows them on a map. A UGV module on the robot lets the operator send it to a victim, drive it, and talk to the victim. Both modules work on any drone or robot of their kind.
 
 | File | What's in it |
 | --- | --- |
 | [TODO.md](TODO.md) | What to do next. Start here |
-| [SPEC.md](SPEC.md) | What we are building: agreed decisions, assumptions, interfaces, operator map |
+| [SPEC.md](SPEC.md) | What we are building: agreed decisions, modules, interfaces, operator map |
 | [QUESTIONS.md](QUESTIONS.md) | Everything not settled, with the agenda for the next supervisors' meeting on top |
 | [research/datasets/](research/datasets/) | Training and test data, results, laptop test plan, earlier dataset audits |
-| [research/communication/](research/communication/) | Link budget: frame sizes, coverage, WiFi range and setup |
+| [research/communication/](research/communication/) | Link budget and network setup |
 | [research/literature/](research/literature/) | Literature review (CSV) |
-| [src/detection/](src/detection/) | Code |
+| [src/detection/](src/detection/) | Detector training and scoring code |
+| [interface/](interface/) | Operator UI |
 | [paper/](paper/) | Final report (LaTeX) and `references.bib` |
 
 ## Deployment diagram
@@ -21,33 +22,36 @@ What runs where, and what each WiFi link carries. Mermaid has no UML deployment 
 
 ```mermaid
 flowchart LR
-    subgraph DR["Drone: Raspberry Pi"]
-        DC["RGB camera<br/>thermal camera"]
-        DT["GPS, compass,<br/>barometer"]
-        DS["Frame streamer<br/>(+ SD recording)"]
-        DC --> DS
-        DT --> DS
+    subgraph DR["Drone, flown by a pilot"]
+        subgraph UAV["UAV module: Raspberry Pi"]
+            DC["RGB camera"]
+            DT["GPS, compass, IMU"]
+            DS["Frame streamer<br/>(+ SD recording)"]
+            DC --> DS
+            DT --> DS
+        end
     end
-    subgraph VE["Vehicle: station laptop, WiFi access point"]
-        RGB["RGB detector<br/>YOLO26"]
-        TH["Thermal detector<br/>YOLO26"]
-        FU["Late fusion<br/>+ tracking"]
-        MAP["Operator map"]
-        RGB --> FU
-        TH --> FU
-        FU --> MAP
+    subgraph VE["Vehicle"]
+        RT["WiFi router"]
+        subgraph ST["Station laptop"]
+            RGB["RGB detector<br/>YOLO26"]
+            MAP["Operator map"]
+            CTL["Robot control"]
+            RGB --> MAP
+        end
+        RT ---|"Ethernet"| ST
     end
-    subgraph RO["Ground robot: Raspberry Pi"]
-        RC["RGB camera<br/>thermal camera"]
-        RA["Microphone<br/>speaker"]
-        RN["Drive control"]
+    subgraph RO["Ground robot"]
+        subgraph UGV["UGV module: Raspberry Pi"]
+            RC["RGB camera"]
+            RG["GPS, compass, IMU"]
+            RA["Microphone, speaker"]
+        end
+        RN["Robot controller<br/>(Robotics team)"]
+        UGV <-->|"serial"| RN
     end
-    DS -->|"RGB + thermal frames, telemetry<br/>(WiFi 5 GHz)"| RGB
-    DS --> TH
-    RC -->|"RGB + thermal video, status, GPS<br/>(WiFi)"| RGB
-    RC --> TH
-    MAP -->|"drive commands from the operator (WiFi)"| RN
-    RA <-->|"two-way audio (WiFi)"| MAP
+    UAV -->|"RGB frames + pose (WiFi)"| RT
+    UGV <-->|"video, status, audio /<br/>modes, commands, audio (WiFi)"| RT
 ```
 
 ## Sequence diagram: one mission
@@ -57,25 +61,26 @@ sequenceDiagram
     participant T as Rescue team
     participant C as Mobile carrier
     participant O as Operator + station
-    participant D as Drone
+    participant P as Pilot + drone
     participant R as Ground robot
     participant V as Victim
     T->>C: Request last known phone locations
     C-->>T: Candidate zone (a cell sector)
     T->>O: Narrow it to one collapse site, drive there, park
-    O->>D: Launch, hover over the site
+    O->>P: Fly over the site
     loop Every frame
-        D->>O: RGB + thermal frames, GPS, altitude, heading
-        O->>O: Detect in each modality, fuse boxes, track, update map
+        P->>O: RGB frame, GPS, altitude, attitude
+        O->>O: Detect, place boxes on the ground, update map
     end
     O->>O: Operator confirms a victim marker
+    O->>R: AUTO: go to the victim's coordinates
     loop Until the robot reaches the victim
-        O->>R: Drive commands from the operator
-        R->>O: RGB + thermal video, status, position
+        R->>O: Video, position, status
+        O-->>R: Operator takes over (MANUAL) when needed
     end
     R-->>V: Two-way audio with the operator
-    O->>O: Operator sets status and triage colour
-    O->>T: Victim locations and status
+    O->>O: Operator marks the victim reached, adds a note
+    O->>T: Victim locations and notes
 ```
 
 ## State diagram: a victim marker
@@ -84,14 +89,13 @@ What the station tracks for each victim. A marker stays on the map after the per
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Detected: box from RGB, thermal or both
+    [*] --> Detected: box from the RGB detector
     Detected --> Rejected: operator says false positive
     Detected --> Confirmed: operator confirms
-    Confirmed --> Dispatched: operator drives the robot there
-    Dispatched --> Verified: robot reaches the victim
-    Verified --> Triaged: operator sets START colour
+    Confirmed --> Dispatched: robot sent there
+    Dispatched --> Reached: robot reaches the victim
     Rejected --> [*]
-    Triaged --> [*]
+    Reached --> [*]
 ```
 
 ## Team

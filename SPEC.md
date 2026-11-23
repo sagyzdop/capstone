@@ -6,128 +6,129 @@ What the team has agreed to build. Anything still under discussion is in [QUESTI
 
 In scope:
 
-- victim detection on the station, from the drone's and the robot's RGB and thermal streams;
+- two sensor modules that work on any platform of their kind: a UAV module for drones and a UGV module for ground robots ([Modules](#modules));
+- victim detection on the station, from the UAV module's RGB stream;
 - the operator map;
-- the operator driving the robot from the station, steering by the robot's GPS position drawn on the drone footage (the robot's own camera is optional for this), and receiving its streams;
-- two-way audio between the operator and the victim, through the robot;
+- controlling the ground robot from the station: the operator drives it, or sends it to a victim's coordinates and it drives there itself, and can take over at any moment;
+- two-way audio between the operator and the victim, through the UGV module;
 - decision-making by an agent (RL or decision-theoretic planning), built on top of operator control. How is still open (QUESTIONS.md);
 - evaluation as a live demo with the Robotics team, plus detection scores against a baseline.
 
 Out of scope:
 
-- path planning and autonomous navigation, for both the vehicle and the robot, until detection works. A person drives the vehicle and the operator drives the robot. Supervisors still have to agree (QUESTIONS.md item 2);
-- robot locomotion and hardware design, which belong to the Robotics team;
+- thermal imaging. Drone thermal cameras that resolve a person at working altitude (640×512) cost thousands of dollars, and our thermal model was never tested on a site it didn't train on. The thermal runs stay in [research/datasets/](research/datasets/README.md) as a record;
+- triage (START colours). A robot can check only 2 of START's 5 steps; the operator keeps a free-text note per victim instead;
+- flying the drone. A pilot flies it with its own controller, and the drone's own failsafes (return-to-home on signal loss) apply;
+- path planning beyond "drive to a GPS point", and the vehicle driving itself. A person drives the vehicle;
+- robot locomotion, hardware, go-to-point driving and collision handling, which belong to the Robotics team;
 - carrier-side location services, which we assume are available.
 
 ## System
 
 | Decision | Why |
 | --- | --- |
-| A vehicle carries the station laptop, drone and robot to a predefined site and parks there. | Defines a fixed station. A moving vehicle is proposed in QUESTIONS.md. |
-| The site is a known collapse site, chosen before deployment. Rescue teams get last-known phone locations from mobile carriers, which gives a cell sector, and an operator narrows that to one building. | One hover at 40 m images about 58 × 43 m (0.0025 km²) and never grows. An urban cell sector is about 28 km², roughly 11,000 times larger, so the drone cannot search it. |
-| The drone flies to one point and hovers. | Follows from the line above. |
-| No processing runs on the drone. It captures and streams. | The station has the compute. |
-| The station is the only compute node and the orchestrator: detection, fusion, tracking, the map and the robot's remote control all run there. | One machine to power and configure on site. |
+| A vehicle carries the station laptop, the WiFi router, the drone and the robot to the site and parks there. | Defines a fixed station. |
+| The site is a known collapse site, chosen before deployment. Rescue teams get last-known phone locations from mobile carriers, which gives a cell sector, and an operator narrows that to one building. | One frame at 40 m images about 58 × 43 m (0.0025 km²). An urban cell sector is about 28 km², roughly 11,000 times larger, so the drone can't search it. |
+| A pilot flies the drone with its own controller. Nothing on the station flies it. | No flight logic to build, and it works with any drone. |
+| The station is the only compute node and the orchestrator: detection, the map and the robot's control all run there. Modules capture and stream. | One machine to power and configure on site. |
 | The ground robot is a spherical "tumbleweed" rolling robot built by the Robotics team. | Their design. |
-| Drone and robot each run a Raspberry Pi. The Robotics team confirmed this for the robot on 2026-10-18. | One bill of materials, one setup process, shared spares. A Pi also records to SD, so a dropped link loses no frames. |
-| The Pi's onboard WiFi is not enough; it needs a USB adapter and an external 5 GHz antenna. | The drone's load is about 71 Mbit/s against a measured 80 to 110 Mbit/s for the onboard 1×1 trace antenna, so the margin is spent before any range loss. Recommended: Pi 5 + MT7921AUN adapter, about $110 to 135 and 80 g mounted. Pi Zero 2W is out (no 5 GHz). An ESP32 is out (2.4 GHz only, 11 to 20 Mbit/s, cannot JPEG-encode at 30 FPS while flying). |
-| The station laptop is the WiFi access point; drone and robot join as clients. | No extra powered device on site. Sharing costs 30 to 40% throughput, and macOS allows about ten clients. |
-| 5 GHz, 80 MHz, non-DFS channel. 2.4 GHz is the fallback in rubble. | About 3× the throughput of 2.4 GHz. A DFS radar check mid-flight would drop the link. |
-| Design against 100 Mbit/s per link. | Half of a pessimistic 200 Mbit/s client rate. A measured 802.11ax curve puts 100 Mbit/s at about 348 m in free space; the working range is 20 to 120 m, so rubble, at 10 to 30 dB per dense wall, is the real limit. |
-| The hover ceiling is 49 m with the assumed cameras; 40 m is the safe working height. | Below 8 px a standing person is mostly missed; thermal at 640×512 and RGB at 1280×1024 tiled both reach 8 px at 49 m and 10 px at 40 m. Lying people stay visible in thermal to about 80 m. Real SAR datasets fly at 40 to 65 m ([comparison](research/datasets/README.md#how-high-the-drone-can-fly)). |
+| A WiFi router on the vehicle is the access point. The station plugs into it by Ethernet; modules join over WiFi with fixed IP addresses. | Recent macOS no longer creates ad-hoc networks. On Ethernet, the station's traffic crosses the air once instead of twice. |
+| The current router (Huawei HG658 V2) is temporary. It is 2.4 GHz only, so streams are sized to fit about 20 Mbit/s in total. | A dual-band router would allow more; see QUESTIONS.md. |
+| The drone's ceiling is 49 m; 40 m is the safe working height. | Below 8 px a standing person is mostly missed; 1280 px RGB, tiled, reaches 8 px at 49 m and 10 px at 40 m. Lying people are about twice as large. Real SAR datasets fly at 40 to 65 m ([comparison](research/datasets/README.md#how-high-the-drone-can-fly)). |
 
-Setup commands, coverage tables and the full link budget: [research/communication/](research/communication/).
+Setup and the link budget: [research/communication/](research/communication/).
+
+## Modules
+
+A module is a Raspberry Pi with sensors that bolts onto a platform and talks only to the station. It can't read the platform's own telemetry, so it carries its own GPS and attitude sensor. Two types are built now; others can follow on the same core, for example a wearable module that shows rescuers on the map.
+
+| | UAV module | UGV module |
+| --- | --- | --- |
+| Goes on | Any drone that can lift about 300 g and has a mount point | Any ground robot that accepts the [control commands](#ugv-module-interface) |
+| Camera | RGB, pointing down | RGB, forward |
+| Sends | Frames for detection, with pose | Video for the operator, position, battery, robot status |
+| Receives | Nothing | Mode, drive and go-to commands, heartbeat |
+| Audio | No | Two-way, with echo cancellation |
+| Link to the platform | None; powered by its own battery | Serial or USB to the robot's controller |
+
+Shared parts. Example parts fit the spec but haven't been bought or tested.
+
+| Item | Spec we need | Example part |
+| --- | --- | --- |
+| Computer | Raspberry Pi 5. No detection runs on it; it encodes JPEG and streams, and records to SD so a dropped link loses no frames. | Raspberry Pi 5, 4 GB |
+| RGB camera | At least 1280 px wide, about 66 to 72° HFOV, CSI or USB | Raspberry Pi Camera Module 3, standard lens (66° HFOV, 4608×2592), streamed as 1280×720 |
+| GPS and compass | GPS module with a built-in compass, UART. About 2 to 5 m accuracy | u-blox NEO-M8N or M9N drone GPS module |
+| Attitude | IMU giving roll, pitch and yaw, so each frame can be placed on the ground. At 40 m, 5° of tilt moves a victim about 3.5 m | BNO085 breakout |
+| WiFi | USB adapter with an external antenna; the onboard trace antenna loses range next to batteries and motors | MT7921AUN adapter, for example the Alfa AWUS036AXML |
+| Microphone and speaker (UGV only) | One USB speakerphone with echo cancellation | Any USB conference speakerphone |
 
 ## Streams
 
-The drone and the robot carry the same modules: the same RGB camera, thermal camera, Raspberry Pi and WiFi adapter, and the same streamer software. Each sends RGB and thermal as two separate streams of JPEG frames, each frame with a timestamp and the platform's GPS position and heading (the drone adds altitude and camera angle). The streams differ only in resolution and frame rate, because the people they look at differ in size.
+What `imgsz=640` needs: the model sees at most 640 px across per pass, and people must be at least 8 px (ideally 10) at that input. A frame wider than 640 only helps if the station cuts it into 640×640 tiles (20% overlap) and runs the model on each.
 
-What `imgsz=640` needs: the model sees at most 640 px across per pass, and people must be at least 8 px (ideally 10) at that input. A frame wider than 640 only helps if the station cuts it into 640×640 tiles (20% overlap) and runs the model on each, which costs one detector pass per tile.
+| Stream | Sent as | Used for | FPS | Bandwidth (estimate) |
+| --- | --- | --- | --- | --- |
+| UAV RGB | 1280×720 JPEG, tiled on the station | Detection: 10 px standing at 40 m | 3 to 5 | about 13 Mbit/s at 5 FPS |
+| UGV RGB | 640×360 JPEG | The operator only; no detection | 5 | about 3 Mbit/s |
 
-| Stream | Sent as | At the model | Person size | FPS (predicted) | Bandwidth |
-| --- | --- | --- | --- | --- | --- |
-| Drone thermal | 640×512, native | as is, 1 pass | 10 px standing at 40 m, 8 px at 49 m | 30 | 34 Mbit/s |
-| Drone RGB | 1280×1024 | 6 tiles of 640×640 | 10 px at 40 m, 8 px at 49 m | 10 | 37 Mbit/s |
-| Robot thermal | 640×512, native | as is, 1 pass | large: people are metres away | 5 | about 6 Mbit/s |
-| Robot RGB | 640×512, resized on the Pi | as is, 1 pass | large | 5 | about 5 Mbit/s (estimate) |
-
-Total about 82 of the 100 Mbit/s budget, plus audio and telemetry.
+Each frame carries a sequence number, GPS time, and the module's position and attitude. Audio, telemetry and commands add under 1 Mbit/s.
 
 | Decision | Why |
 | --- | --- |
-| Drone RGB is sent at 1280×1024 and tiled on the station, not resized. | Resizing to 640 halves every person, to 5 px at 40 m, so RGB would only work below about 25 m. A 4K camera would cover the same ground (coverage is 2·altitude·tan(HFOV/2), with no sensor width in it) for 4× the bytes. On 4K RGB, tiling scored AP50 0.324 against 0.030 for resizing to 640. |
-| Tiling happens on the station. | Tiling on the drone sends 4.3 MiB per frame instead of 1.8 MiB. |
-| The robot sends 640×512 at 5 FPS. | At ground level people are metres away and large, so no tiling. A slow robot needs no more than 5 FPS, and it keeps the robot's share of the link small. |
+| UAV RGB is sent at 1280 px and tiled on the station, not resized. | Resizing to 640 halves every person, to 5 px at 40 m. A 4K camera covers the same ground for 4× the bytes. On 4K RGB, tiling scored AP50 0.324 against 0.030 for resizing to 640. |
+| 3 to 5 FPS is enough. | The pilot flies by the drone's own video; the module's stream is only for detection, and each person stays in view for many frames. |
+| The UGV stream isn't run through the detector. | The detector was trained on drone footage looking down. Up close, the operator sees the victim directly. |
 
-All four streams go through the same two detectors and the same late fusion. Frame rates are predictions from YOLO11n timings until the [laptop test](research/datasets/README.md#test-on-the-station-laptop) replaces them, and the robot's bandwidth is scaled from the drone's frames. The detectors were trained only on drone footage, so how well they work from the robot's ground-level view is open (QUESTIONS.md).
+Frame rates and bandwidth are estimates until the [laptop test](research/datasets/README.md#test-on-the-station-laptop) and a link test on the real router replace them.
 
 ## Detection
 
 | Decision | Why |
 | --- | --- |
 | YOLO26 (Ultralytics), nano first, then small. | Nano: 2.4M parameters, 5.5 GFLOPs, 40.9 COCO mAP50-95. Small: 9.5M, 20.9 GFLOPs, 48.6. Small is the step up if nano's accuracy falls short and the laptop has headroom. |
-| Two separate models, one RGB and one thermal, each trained only on its own modality. Datasets with both modalities are split by modality before training. | Late fusion: the models run independently on their own streams. |
-| Trained on the raw datasets with `imgsz=640`. | Ultralytics resizes on load, so no preprocessing step. |
-| Training sets. RGB: SARD, NII-CU-MAPD, HERIDAL (its training locations) and NOMAD (its training actors). Thermal: RGBTDronePerson, NII-CU-MAPD and HIT-UAV. | RGBTDronePerson's labels are drawn on its thermal images and miss people on its RGB images, so it trains thermal only. Details, caveats and results: [research/datasets/](research/datasets/README.md). |
+| One RGB model, trained with `imgsz=640` on SARD, NII-CU-MAPD (RGB), HERIDAL (its training locations) and NOMAD (its training actors). | Details, caveats and results: [research/datasets/](research/datasets/README.md). |
 | Detector output is JSON, one record per box: `{"image", "bbox_xyxy", "conf"}`. | Already written by `src/detection/detect.py`. |
-
-### Late fusion
-
-1. Each model produces boxes in its own image.
-2. Thermal boxes are mapped into RGB pixels with a homography calibrated once for the real camera pair. The two cameras have different fields of view: on WiSARD, thermal covers 64% of the RGB frame, with a median error of 7.7 thermal pixels after a linear fit. That is good enough for matching boxes, not for merging pixels.
-3. Boxes from the two modalities that overlap (IoU above a threshold, to be tuned) are one person. Their combined confidence is `1 − (1 − p_rgb)(1 − p_thermal)`, so agreement raises it.
-4. A box seen by only one model is kept with its own confidence, tagged with that modality.
-5. Across frames, a tracker links boxes into one victim. Each victim becomes one map marker, placed on the ground using the telemetry of the drone or robot that saw it.
+| Each box is placed on the ground from the UAV module's position, altitude and attitude, and boxes from many frames that land on the same spot become one victim marker. | How close counts as "the same spot" is open (QUESTIONS.md). |
 
 ## Operator map
 
 On the station screen, so it costs nothing on the network.
 
 - Satellite basemap, downloaded before the mission, since there may be no internet on site. It shows the area before the quake, so live imagery is drawn over it.
-- The latest drone frame, projected onto the map from the drone's GPS, altitude, heading and camera angle. For the demo, only the latest frame. Stitching frames into a mosaic is a later step.
+- The latest drone frame, projected onto the map from the UAV module's pose. For the demo, only the latest frame. Stitching frames into a mosaic is a later step.
 - The drone's current footprint outlined, plus a layer showing how long ago each area was last in view.
-- Victim markers, which stay after the person leaves the frame. Each shows last-seen time, modality (RGB, thermal or both) and confidence.
+- Victim markers, which stay after the person leaves the frame. Each shows last-seen time and confidence.
 - Confirm and reject on every marker, so a false positive never sends the robot.
-- Robot position from its GPS, its track, battery and link state.
-- Victim status from the marker lifecycle in the README: detected, confirmed, dispatched, verified, then a START colour.
+- Robot position from its GPS, its track, battery, mode and link state.
+- Victim status from the marker lifecycle in the README: detected, confirmed, dispatched, reached. A reached victim gets the operator's free-text note.
 - Link health for every stream, so a frozen feed is not mistaken for an empty scene. Audio failure in particular must be visible: two-way conversation needs under 300 ms round trip, and WiFi reassociation takes seconds.
 
-## Robot interface
+## UGV module interface
 
-What we need from the Robotics team. They have not reviewed it yet.
+What we need from the Robotics team's robot. They have not reviewed it yet.
 
 | Requirement | Status |
 | --- | --- |
-| Accept drive commands (speed and turn) from the station over WiFi | Proposed |
-| Stop on its own when commands stop arriving, for example after a dropped link | Proposed |
-| Stream RGB and thermal as JPEG frames, 640×512 at 5 FPS each ([Streams](#streams)). If the operator drives by this video, camera-to-screen plus command delay should stay under about 300 ms | Proposed |
-| Two-way audio with the victim | Proposed |
-| Carry the equipment below | Proposed |
-| Report its GPS position, battery and health | Proposed |
+| Three modes set from the station: MANUAL (follow speed and turn commands), AUTO (drive to a given GPS point on its own) and HOLD (stop). Any manual command from the operator switches it to MANUAL | Proposed |
+| In AUTO, report progress: driving, arrived (within about 5 m, GPS accuracy) or blocked (collision detected) | Proposed |
+| Stop on its own when the station's heartbeat stops arriving for 1 s, in every mode | Proposed |
+| Carry the UGV module and power it | Proposed |
+| Report battery and health to the module | Proposed |
 
-Proposed equipment. The drone carries the same, minus the audio; the specs come from [Streams](#streams). Example parts fit the spec but haven't been bought or tested.
+If the operator drives by the module's video, camera-to-screen plus command delay should stay under about 300 ms.
 
-| Item | Spec we need | Example part |
-| --- | --- | --- |
-| Thermal camera | LWIR, 640×512, about 40° HFOV, USB (UVC) output so the Pi reads it like a webcam | FLIR Boson 640 with its USB module. Lenses come in fixed fields of view, and the lens sets the drone's ceiling for a standing person: 50° gives about 39 m, 32° about 63 m but less ground. |
-| RGB camera | At least 1280 px wide, about 66 to 72° HFOV, CSI or USB | Raspberry Pi Camera Module 3, standard lens (66° HFOV, 4608×2592). It is 16:9, so the stream is 1280×720 on the drone and 640×360 on the robot instead of 5:4; person size depends only on width and HFOV, so the detection numbers hold. |
-| Computer | Raspberry Pi 5. No detection runs on it; it encodes JPEG and streams. | Raspberry Pi 5, 4 GB |
-| WiFi | USB adapter on 5 GHz, with an external antenna | MT7921AUN adapter (about 350 Mbit/s real), for example the Alfa AWUS036AXML |
-| GPS and compass | GPS module with a built-in compass, UART | u-blox NEO-M8N or M9N drone GPS module. About 2 to 5 m accuracy, enough to draw the robot on the map. |
-| Microphone and speaker | One USB speakerphone with echo cancellation, so the victim doesn't hear their own voice back | Any USB conference speakerphone |
-| Drive, motors, battery | The Robotics team's design | |
-
-The robot does not talk to the drone. Both report to the station, which draws the robot's GPS position on the drone footage and the map. That is enough to steer by; the robot's video helps up close.
+The robot doesn't talk to the drone. Both modules report to the station, which draws the robot's position on the drone footage and the map.
 
 Known robot facts, with source and date:
 
 | Attribute | Value | Source |
 | --- | --- | --- |
 | Platform | Spherical "tumbleweed" rolling robot | Robotics team, 2026-10-04 |
-| Onboard computer | Raspberry Pi, same as the drone | Robotics team, 2026-10-18 |
+| Onboard computer | Raspberry Pi | Robotics team, 2026-10-18 |
 | GPS module | Can be carried | Our team, 2026-10-29 |
+| Autonomy | Can drive to a point, detecting collisions from motor voltage spikes | Robotics team, 2026-11 |
 
-Antenna placement, size and weight are unknown (QUESTIONS.md).
+Antenna placement, size and payload are unknown (QUESTIONS.md).
 
 ## Assumptions
 
@@ -138,25 +139,25 @@ Things we treat as true without having checked. They mark the edge of what we bu
 | Rescue teams can get last-known phone locations from carriers (CDR / cell site analysis), and an operator can narrow the sector to one building. For the demo, the carrier data and the collapse site are simply given. | We don't know where to go. |
 | The vehicle can reach the site and park. | The station's position and coverage change. |
 | The robot's drop point is known. | The robot has to locate itself from scratch. |
-| WiFi connects station, drone and robot, on one network run by the station laptop. | Video and control links fail. |
-| Each link sustains 100 Mbit/s. | Every image size and frame rate scales down with it. |
-| Rubble costs no more than one wall's attenuation on the drone's line of sight. | The link drops, and no return behaviour exists yet. |
+| WiFi connects the station and every module, on one network run by the router on the vehicle. | Video and control links fail. |
+| The router carries about 20 Mbit/s for all streams together. | Frame rates scale down with it. |
+| Rubble costs no more than one wall's attenuation on the line of sight to a module. | The link drops. |
 
 ## Terms
 
 | Term | Meaning |
 | --- | --- |
 | Station | The laptop on the vehicle. |
-| Vehicle | Carries the station, drone and robot. Previously called the "moving station". |
+| Vehicle | Carries the station, router, drone and robot. |
 | Operator | The person at the station. |
+| Pilot | The person flying the drone with its own controller. |
+| Module | A Raspberry Pi with sensors that bolts onto a platform and streams to the station. UAV module for drones, UGV module for ground robots. |
 | CDR | Call detail record: the carrier's log of which tower a phone used. |
 | Candidate zone | The cell sector the carrier data gives; hundreds of metres to kilometres across. |
 | Tagging | Placing a victim marker on the map so the operator can send the robot to it. |
-| START | Simple Triage And Rapid Treatment: red immediate, yellow delayed, green minor, black deceased or expectant. |
 | `imgsz` | Model input size in pixels. Not the camera resolution. |
 | Tiling | Splitting a large frame into overlapping 640×640 crops (20% overlap) and running the model on each. |
 | AP50 | Average precision at IoU ≥ 0.5. Our main accuracy number. |
-| Late fusion | Combining the RGB and thermal models' boxes, rather than their pixels or features. |
 | GSD | Ground sampling distance, metres of ground per pixel: 2·altitude·tan(HFOV/2) ÷ image width. |
 
 Image measurement terms (person size, contrast, sharpness, crowding) are defined in [research/datasets/](research/datasets/README.md#measures).
