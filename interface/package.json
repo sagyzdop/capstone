@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "export-model": "python scripts/export_model.py",
-    "thermal-model": "python scripts/make_thermal_model.py",
     "dev": "node server.mjs --dev",
     "build": "next build",
     "start": "node server.mjs",

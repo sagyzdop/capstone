@@ -11,7 +11,6 @@ cd interface
 npm install
 conda activate capstone
 npm run export-model     # once: best.pt -> models/best.onnx + models/best.json (active python, needs ultralytics onnx onnxslim)
-npm run thermal-model    # once: models/thermal.onnx + models/thermal.json for the MLX90640 page (needs onnx)
 npm run dev              # or: npm run build && npm start
 ```
 
@@ -63,14 +62,6 @@ The Pi only captures. It runs `ustreamer`, which passes the Logitech webcam's ow
 - `GET /api/picam/stream?src=` re-serves the feed from this origin for the stage `<img>`, dropping frames for slow readers. `GET /api/picam/frame?src=` returns the newest JPEG, which the page posts to `/api/detect` as is. It answers 503 with the reason (connecting, host not found, not an MJPEG stream) when there is no frame from the last 3 s, so the detector never runs on a frozen frame.
 - No Pi: `python ../raspberry/fake_cam_stream.py [--video clip.mp4 | --webcam]` serves the same `/stream` on port 8080 (needs ffmpeg).
 
-## MLX90640 thermal
-
-The Pi runs `raspberry/mlx_stream.cpp` (in git history, `e560cd2`) and sends 3096-byte UDP packets (768 float32 °C, 24×32) to this machine on port 5005 (`THERMAL_UDP_PORT` to change). `lib/thermal.ts` listens, renders each frame to a 640×480 JPEG and runs `models/thermal.onnx` on the raw temperatures.
-
-- http://localhost:8765/thermal shows the live frame with person boxes, min/max/sensor °C and frame age.
-- `GET /api/thermal/frame` is the JPEG; header `x-thermal-detections` carries that frame's boxes. `GET /api/thermal/detections` is the same as JSON. Both answer 503 until frames arrive.
-- `thermal.onnx` is not trained: no labelled MLX90640 data exists yet. It is a fixed body-temperature band (28 to 40 °C, `scripts/make_thermal_model.py --lo --hi`) with a 3×3 smoothing, giving a per-pixel person probability; blobs of 3+ pixels above 0.5 become boxes (`threshold`, `min_pixels` in `thermal.json`). A trained model drops in if it keeps the contract: input `[1,1,24,32]` °C, output `[1,1,24,32]` probability. Two people touching merge into one box, and a warm room (≥ 28 °C) lights up everywhere.
-
 ## Layout
 
 | Path | What |
@@ -80,6 +71,4 @@ The Pi runs `raspberry/mlx_stream.cpp` (in git history, `e560cd2`) and sends 309
 | `app/api/{info,detect,samples}` | Model info, detection, example frames |
 | `components/Station.tsx` | The whole page |
 | `scripts/export_model.py` | ONNX export with dynamic input size |
-| `lib/thermal.ts`, `app/api/thermal/*`, `app/thermal/` | MLX90640 UDP ingest, person boxes, live page |
 | `lib/picam.ts`, `app/api/picam/{frame,stream}` | Pi webcam MJPEG ingest, newest frame, re-served stream |
-| `scripts/make_thermal_model.py` | Writes `models/thermal.onnx` + `thermal.json` |

@@ -89,7 +89,8 @@ async function load(name: string): Promise<Model> {
 
 /** Decode any image (EXIF-rotated) to packed RGB. */
 export async function decode(buf: Buffer): Promise<Raw> {
-  const { data, info } = await sharp(buf).rotate().removeAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
+  // webcam MJPEG frames often carry harmless corruption warnings, which sharp rejects by default
+  const { data, info } = await sharp(buf, { failOn: "none" }).rotate().removeAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height };
 }
 

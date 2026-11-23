@@ -1,10 +1,9 @@
-# Raspberry Pi: камера Logitech и MLX90640 → станция по Wi-Fi
+# Raspberry Pi: камера Logitech → станция по Wi-Fi
 
 Pi только снимает и отправляет. Детекция идёт на ноутбуке, в `interface/`.
 
 ```
 Logitech USB ──► Pi: ustreamer :8080/stream (MJPEG, без перекодирования) ──Wi-Fi──► ноутбук: interface (Pi cam) → детектор
-MLX90640 I2C ──► Pi: mlx_stream (UDP :5005)                              ──Wi-Fi──► ноутбук: interface /thermal
 ```
 
 ## 1. Сеть: два варианта
@@ -67,6 +66,3 @@ cd interface && npm run dev
 | --- | --- | --- |
 | `webcam_setup.sh` | Pi | ustreamer + systemd, переключение Wi-Fi / точки доступа |
 | `fake_cam_stream.py` | ноутбук | имитатор камеры на Pi (MJPEG `/stream`, как у ustreamer) |
-| `mlx_stream.cpp` | Pi | MLX90640 → UDP |
-| `fake_mlx_stream.py` | ноутбук | имитатор MLX90640 |
-| `thermal_receiver.py` | ноутбук | простой просмотр тепловизора без интерфейса |
